@@ -17,6 +17,8 @@ type Loc = Int
 
 type Counter = Int
 
+type Clock = (Site, Counter)
+
 type Id = (Loc, Site)
 
 type Pos = ([Id], Counter)
@@ -25,9 +27,10 @@ type LChar = (Char, Pos)
 
 type LString = ([LChar], [Op])
 
-type Clock = (Site, Counter)
+type LFile = (LString, Clock)
 
-data Op = Ins LChar | Del LChar deriving Show
+data Op = Ins LChar | Del LChar deriving (Read, Show)
+
 
 beginning :: Pos
 beginning = ([(0, 0)], 0)
@@ -38,12 +41,21 @@ end = ([(maxBound, 0)], 0)
 incClock :: Clock -> Clock
 incClock (s, h) = (s, h + 1)
 
+incSite :: Clock -> Clock
+incSite (s, h) = (s + 1, h)
+
 clkCnt :: Clock -> Int
 clkCnt = snd
+
+clkSite :: Clock -> Int
+clkSite = fst
 
 emptyLString :: LString
 -- emptyLString = ([('.', beginning), ('.', end)], [])
 emptyLString = ([], [])
+
+emptyLFile :: Clock -> LFile
+emptyLFile cl = (emptyLString, cl)
 
 showLString :: LString -> String
 showLString (cs, _) = map fst
@@ -58,20 +70,20 @@ posBetween (s, h) (p1, h1) (p2, h2) = ((bet p1 p2, h), (s, h + 1))
     bet ((pp, ps):r) ((pp', ps'):r')
       | pp == pp' && ps == ps' = (pp, ps):bet r r'
       | pp < pp' - 1           = [(rand pp pp', s)]
-      | s > ps                 = [(1, s)]
+      | s > ps && s < ps'      = [(pp, s)]
       | otherwise              = [(pp, ps), after r]
 
     after []          = (rand 0 maxBound, s)
-    after ((p, s):_)  = (rand 0 p, s)
+    after ((p, s):_)  = (rand p maxBound, s)
 
-    before []         = (rand 0 maxBound, s)
-    before ((p, s):_) = (rand p maxBound, s)
+    before []         = (rand minBound 0, s)
+    before ((p, s):_) = (rand minBound p, s)
 
     rand :: Int -> Int -> Int
     rand x y = x + 1
 
 integrate :: [Op] -> LString -> LString
-integrate ops (cs, sops) = go (ops ++ sops) (cs, [])
+integrate ops (cs, sops) = {--(\x -> trace ("INT: " ++ show ops ++ "\nSOPS" ++ show sops) x) $--} go (ops ++ sops) (cs, [])
   where
     go [] str     = str
     go (op:ops) (cs, sops)
@@ -85,7 +97,8 @@ integrate ops (cs, sops) = go (ops ++ sops) (cs, [])
           | isJust $ find (==c) str = (delete c str, Nothing)
           | otherwise               = (str, Just op)
         go' op@(Ins c@(_, (p, _))) str
-          | isJust $ find ((==p) . fst . snd) str = (str, Just op)
+          -- | trace ("OP: " ++ show op ++ ", R: " ++ show p) False = undefined
+          | isJust $ find ((==p) . fst . snd) str = (str, Just op) --(str, Just op)
           | otherwise                             = (c : str, Nothing)
 
 diffLString :: Clock -> String -> LString -> ([Op], Clock)
@@ -134,4 +147,4 @@ test = showLString r
     t2 = integrate op2 emptyLString
     (op2', c2') = diffLString (0, 0) "cc866cc" t2
 
-    r = integrate op2 $ integrate op1' $ integrate op1 $ integrate op2' emptyLString
+    r = integrate op1 $ integrate op1' $ integrate op2 $ integrate op2' emptyLString

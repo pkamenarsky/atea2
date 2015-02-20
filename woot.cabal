@@ -18,11 +18,21 @@ cabal-version:       >=1.10
 executable atea
   main-is:             Main.hs
   -- exposed-modules:     Woot
-  other-modules:       Woot
+  other-modules:       Woot,
+                       Test
   -- other-extensions:    
-  build-depends:       base >=4.6 && <4.7,
-                       mtl,
+  build-depends:       base >=4.7 && <4.8,
+                       aeson,
+                       containers,
                        Diff,
-                       strict
+                       mtl,
+                       either,
+                       QuickCheck,
+                       servant,
+                       servant-client,
+                       servant-server,
+                       strict,
+                       transformers,
+                       warp
   hs-source-dirs:      src
   default-language:    Haskell2010
