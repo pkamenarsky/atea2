@@ -85,6 +85,8 @@ server st = rPush
        :<|> rPrint
   where
     rPush (ReqPush {..}) = liftIO $ do
+      putStrLn $ "Receiving push from " ++ show rqprSite
+
       as <- readIORef st
       let txt'    = integrate rqpOps (asText as)
           lastAck = fromMaybe 0 $ (snd . fst) <$> (lastMay $ asOps as)
@@ -93,6 +95,8 @@ server st = rPush
                          }
 
     rPull (ReqPull {..}) = liftIO $ do
+      putStrLn $ "Receiving pull from " ++ show rqpSite
+
       as <- readIORef st
       let siteAck = fromMaybe (-1) $ M.lookup rqpSite (asAck as)
           lastAck = fromMaybe (rqpSite, 0) $ fst <$> (lastMay $ asOps as)
@@ -103,9 +107,14 @@ server st = rPush
     rCreate = liftIO $ do
       as <- readIORef st
       writeIORef st $ as { asClock = incSite $ asClock as }
+
+      putStrLn $ "Receiving create, new site: " ++ show (incSite $ asClock as)
+
       return $ asClock as
 
     rPrint = liftIO $ do
+      putStrLn "Receiving print state"
+
       as <- readIORef st
       print as
 
