@@ -15,6 +15,7 @@ import           Data.Proxy
 import           Network.Wai.Handler.Warp
 
 import           System.Environment
+import           System.FilePath.Posix
 import qualified System.IO.Strict             as SIO
 
 import           Servant.API
@@ -123,12 +124,12 @@ argCreate :: String -> IO ()
 argCreate file = do
   Right cl <- runEitherT $ reqCreate url
 
-  writeFile (file ++ ".txt") ""
+  writeFile (file ++ ".org") ""
   writeFile (file ++ ".atea") $ show $ emptyLFile cl
 
 argPush :: String -> IO ()
 argPush file = do
-  str        <- readFile (file ++ ".txt")
+  str        <- readFile (file ++ ".org")
   (lstr, cl) <- read <$> readFile (file ++ ".atea")
 
   putStrLn "Integrating..."
@@ -144,7 +145,7 @@ argPush file = do
 
 argPull :: String -> IO ()
 argPull file = do
-  str        <- readFile (file ++ ".txt")
+  str        <- readFile (file ++ ".org")
   (lstr, cl) <- read <$> readFile (file ++ ".atea")
 
   putStrLn "Requesting changes..."
@@ -154,7 +155,7 @@ argPull file = do
   putStrLn "Integrating..."
   let lstr' = integrate rspOps lstr
 
-  writeFile (file ++ ".txt") (showLString lstr')
+  writeFile (file ++ ".org") (showLString lstr')
   writeFile (file ++ ".atea") $ show (lstr', cl)
 
 argPrint :: IO (Either String ())
@@ -166,8 +167,8 @@ main = do
 
   case args of
     ["--serve"]       -> runServer
-    "--create":file:_ -> argCreate file
-    "--push":file:_   -> argPush file
+    "--create":file:_ -> argCreate $ dropExtension file
+    "--push":file:_   -> argPush $ dropExtension file
     otherwise         -> return ()
 
 test :: IO ()
@@ -175,8 +176,8 @@ test = do
   argCreate "test"
   argCreate "test2"
 
-  writeFile "test.txt" "666\n"
-  writeFile "test2.txt" "777\n"
+  writeFile "test.org" "666\n"
+  writeFile "test2.org" "777\n"
 
   argPush "test"
   argPush "test2"
@@ -184,8 +185,8 @@ test = do
   argPull "test"
   argPull "test2"
 
-  writeFile "test.txt" "68866\n777\n"
-  writeFile "test2.txt" "777\n"
+  writeFile "test.org" "68866\n777\n"
+  writeFile "test2.org" "777\n"
 
   argPush "test"
   argPush "test2"

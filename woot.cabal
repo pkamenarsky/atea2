@@ -25,6 +25,7 @@ executable atea
                        aeson,
                        containers,
                        Diff,
+                       filepath,
                        mtl,
                        either,
                        QuickCheck,
