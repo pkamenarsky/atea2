@@ -82,6 +82,10 @@ posBetween (s, h) (p1, h1) (p2, h2) = ((bet p1 p2, h), (s, h + 1))
     rand :: Int -> Int -> Int
     rand x y = x + 1
 
+reverseIns :: Op -> Op
+reverseIns (Ins c) = (Del c)
+reverseIns (Del c) = (Del c)
+
 integrate :: [Op] -> LString -> LString
 integrate ops (cs, sops) = {--(\x -> trace ("INT: " ++ show ops ++ "\nSOPS" ++ show sops) x) $--} go (ops ++ sops) (cs, [])
   where

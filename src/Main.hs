@@ -8,9 +8,13 @@ import           Control.Monad.Trans.Either
 
 import           Data.Aeson
 import           Data.IORef
+import           Data.List
 import qualified Data.Map                     as M
 import           Data.Maybe
 import           Data.Proxy
+import           Data.Time.Clock
+
+import           Text.Parsec
 
 import           Network.Wai.Handler.Warp
 
@@ -26,10 +30,13 @@ import           GHC.Generics
 
 import           Logoot
 import           Test
+import           Ticket
 
 type Ack = Int
 
 data ReqPrintState
+
+data ReqTickets
 
 data ReqPush = ReqPush
   { rqpOps   :: [Op]
@@ -44,11 +51,19 @@ data ResPull = ResPull
   { rspOps :: [Op]
   } deriving (Show, Generic)
 
+data ResTickets = ResTickets
+  { rsActiveSince :: Maybe UTCTime
+  , rsTickets     :: [Ticket]
+  } deriving (Show, Generic)
+
 data AppState = AppState
-  { asClock :: Clock
-  , asText  :: LString
-  , asAck   :: M.Map Site Ack
-  , asOps   :: [((Site, Ack), [Op])]
+  { asClock        :: Clock
+  , asText         :: LString
+  , asAck          :: M.Map Site Ack
+  , asOps          :: [((Site, Ack), [Op])]
+  , asActiveSince  :: Maybe UTCTime
+  , asActiveTicket :: Maybe String
+  , asTickets      :: [Ticket]
   } deriving (Show)
 
 type AppStateIO = IORef AppState
@@ -62,14 +77,24 @@ instance ToJSON ReqPull
 instance FromJSON ResPull
 instance ToJSON ResPull
 
+instance FromJSON ResTickets
+instance ToJSON ResTickets
+
 deriving instance Generic Op
 instance FromJSON Op
 instance ToJSON Op
 
-type Api = "push" :> ReqBody ReqPush :> Post ()
-      :<|> "pull" :> ReqBody ReqPull :> Post ResPull
-      :<|> "create" :> Get Clock
-      :<|> "print" :> Get ()
+instance FromJSON TicketState
+instance ToJSON TicketState
+
+instance FromJSON Ticket
+instance ToJSON Ticket
+
+type Api = "push"    :> ReqBody ReqPush :> Post ()
+      :<|> "pull"    :> ReqBody ReqPull :> Post ResPull
+      :<|> "create"  :> Get Clock
+      :<|> "print"   :> Get ()
+      :<|> "tickets" :> Get ResTickets
 
 api :: Proxy Api
 api = Proxy
@@ -83,16 +108,33 @@ server st = rPush
        :<|> rPull
        :<|> rCreate
        :<|> rPrint
+       :<|> rTickets
   where
     rPush (ReqPush {..}) = liftIO $ do
       putStrLn $ "Receiving push from " ++ show rqprSite
 
       as <- readIORef st
-      let txt'    = integrate rqpOps (asText as)
-          lastAck = fromMaybe 0 $ (snd . fst) <$> (lastMay $ asOps as)
-      writeIORef st $ as { asText = txt'
-                         , asOps  = asOps as ++ [((rqprSite, lastAck + 1), rqpOps)] -- reverse?
-                         }
+
+      let text         = integrate rqpOps (asText as)
+          tickets      = either (const []) id $ runParser prsTickets () "" $ showLString text
+          lastAck      = fromMaybe 0 $ (snd . fst) <$> (lastMay $ asOps as)
+          activeTicket = find ((== TSActive) . tckState) tickets
+
+      print $ runParser prsTickets () "" $ showLString text
+
+      activeSince <- case activeTicket of
+        Just _ -> if (tckName <$> activeTicket) /= asActiveTicket as
+                     then Just <$> getCurrentTime
+                     else return $ asActiveSince as
+        Nothing -> return Nothing
+
+      writeIORef st $ as
+        { asText         = text
+        , asOps          = asOps as ++ [((rqprSite, lastAck + 1), rqpOps)] -- reverse?
+        , asActiveSince  = activeSince
+        , asActiveTicket = tckName <$> activeTicket
+        , asTickets      = tickets
+        }
 
     rPull (ReqPull {..}) = liftIO $ do
       putStrLn $ "Receiving pull from " ++ show rqpSite
@@ -118,12 +160,20 @@ server st = rPush
       as <- readIORef st
       print as
 
+    rTickets = liftIO $ do
+      as <- readIORef st
+
+      return $ ResTickets
+        { rsActiveSince = asActiveSince as
+        , rsTickets     = asTickets as
+        }
+
 runServer :: IO ()
 runServer = do
-  st <- newIORef $ AppState (0, 1) emptyLString M.empty []
+  st <- newIORef $ AppState (0, 1) emptyLString M.empty [] Nothing Nothing []
   run 8000 $ serve api $ server st
 
-(reqPush :<|> reqPull :<|> reqCreate :<|> reqPrint) = client api
+(reqPush :<|> reqPull :<|> reqCreate :<|> reqPrint :<|> reqTickets) = client api
 
 --
 
@@ -178,6 +228,7 @@ main = do
     ["--serve"]       -> runServer
     "--create":file:_ -> argCreate $ dropExtension file
     "--push":file:_   -> argPush $ dropExtension file
+    "--pull":file:_   -> argPull $ dropExtension file
     otherwise         -> return ()
 
 test :: IO ()

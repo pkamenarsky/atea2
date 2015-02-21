@@ -25,14 +25,17 @@ executable atea
                        aeson,
                        containers,
                        Diff,
+                       either,
                        filepath,
                        mtl,
-                       either,
+                       -- orgmode-parse,
+                       parsec,
                        QuickCheck,
                        servant,
                        servant-client,
                        servant-server,
                        strict,
+                       time,
                        transformers,
                        warp
   hs-source-dirs:      src
