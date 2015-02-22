@@ -28,6 +28,7 @@ import           Servant.Server
 
 import           GHC.Generics
 
+import           Cors
 import           Logoot
 import           Test
 import           Ticket
@@ -190,7 +191,7 @@ server st = rPush
 runServer :: IO ()
 runServer = do
   st <- newIORef $ AppState (0, 1) emptyLString M.empty [] Nothing [] []
-  run 8000 $ serve api $ server st
+  run 8000 {-- $ cors --} $ serve api $ server st
 
 (reqPush :<|> reqPull :<|> reqCreate :<|> reqPrint :<|> reqTickets) = client api
 

@@ -22,11 +22,13 @@ executable atea
                        Test
   -- other-extensions:    
   build-depends:       base >=4.7 && <4.8,
+                       bytestring,
                        aeson,
                        containers,
                        Diff,
                        either,
                        filepath,
+                       http-types,
                        mtl,
                        -- orgmode-parse,
                        parsec,
@@ -37,6 +39,7 @@ executable atea
                        strict,
                        time,
                        transformers,
+                       wai,
                        warp
   hs-source-dirs:      src
   default-language:    Haskell2010
