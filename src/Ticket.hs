@@ -65,7 +65,7 @@ prsTicket = do
   return $ Ticket {..}
 
 prsTickets :: Stream s m Char => ParsecT s u m [Ticket]
-prsTickets = many1 prsTicket
+prsTickets = many prsTicket
 
 orgTickets :: [Ticket] -> [Ticket]
 orgTickets []     = []

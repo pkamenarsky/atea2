@@ -52,8 +52,9 @@ data ResPull = ResPull
   } deriving (Show, Generic)
 
 data ResTickets = ResTickets
-  { rsActiveSince :: Maybe UTCTime
+  { rsActiveTicket :: Maybe (String, UTCTime)
   , rsTickets     :: [Ticket]
+  , rsTimeLog     :: [(String, NominalDiffTime)]
   } deriving (Show, Generic)
 
 data AppState = AppState
@@ -61,9 +62,9 @@ data AppState = AppState
   , asText         :: LString
   , asAck          :: M.Map Site Ack
   , asOps          :: [((Site, Ack), [Op])]
-  , asActiveSince  :: Maybe UTCTime
-  , asActiveTicket :: Maybe String
+  , asActiveTicket :: Maybe (String, UTCTime)
   , asTickets      :: [Ticket]
+  , asTimeLog      :: [(String, NominalDiffTime)]
   } deriving (Show)
 
 type AppStateIO = IORef AppState
@@ -79,6 +80,18 @@ instance ToJSON ResPull
 
 instance FromJSON ResTickets
 instance ToJSON ResTickets
+
+r2i :: Rational -> Int
+r2i = floor
+
+i2r :: Int -> Rational
+i2r = fromIntegral
+
+instance ToJSON NominalDiffTime where
+    toJSON  = toJSON . r2i . toRational
+
+instance FromJSON NominalDiffTime where
+    parseJSON v = fromRational . i2r <$> parseJSON v
 
 deriving instance Generic Op
 instance FromJSON Op
@@ -115,25 +128,30 @@ server st = rPush
 
       as <- readIORef st
 
-      let text         = integrate rqpOps (asText as)
-          tickets      = either (const []) id $ runParser prsTickets () "" $ showLString text
-          lastAck      = fromMaybe 0 $ (snd . fst) <$> (lastMay $ asOps as)
-          activeTicket = find ((== TSActive) . tckState) tickets
+      let text      = integrate rqpOps (asText as)
+          tickets   = either (const []) id $ runParser prsTickets () "" $ showLString text
+          lastAck   = fromMaybe 0 $ (snd . fst) <$> (lastMay $ asOps as)
+          activeNow = find ((== TSActive) . tckState) tickets
 
-      print $ runParser prsTickets () "" $ showLString text
+      -- print $ runParser prsTickets () "" $ showLString text
 
-      activeSince <- case activeTicket of
-        Just _ -> if (tckName <$> activeTicket) /= asActiveTicket as
-                     then Just <$> getCurrentTime
-                     else return $ asActiveSince as
-        Nothing -> return Nothing
+      time <- getCurrentTime
+
+      let (activeTicket, timeLog)
+            | Just t             <- activeNow
+            , Just (name, since) <- asActiveTicket as = if tckName t == name
+                then (asActiveTicket as, asTimeLog as)
+                else (Just (tckName t, time) , (name, time `diffUTCTime` since):asTimeLog as)
+            | Just t  <- activeNow = (Just (tckName t, time), asTimeLog as)
+            | Just (name, since) <- asActiveTicket as = (Nothing, (name, time `diffUTCTime` since):asTimeLog as)
+            | otherwise = (Nothing, asTimeLog as)
 
       writeIORef st $ as
         { asText         = text
         , asOps          = asOps as ++ [((rqprSite, lastAck + 1), rqpOps)] -- reverse?
-        , asActiveSince  = activeSince
-        , asActiveTicket = tckName <$> activeTicket
+        , asActiveTicket = activeTicket
         , asTickets      = tickets
+        , asTimeLog      = timeLog
         }
 
     rPull (ReqPull {..}) = liftIO $ do
@@ -164,13 +182,14 @@ server st = rPush
       as <- readIORef st
 
       return $ ResTickets
-        { rsActiveSince = asActiveSince as
-        , rsTickets     = asTickets as
+        { rsActiveTicket = asActiveTicket as
+        , rsTickets      = orgTickets $ asTickets as
+        , rsTimeLog      = asTimeLog as
         }
 
 runServer :: IO ()
 runServer = do
-  st <- newIORef $ AppState (0, 1) emptyLString M.empty [] Nothing Nothing []
+  st <- newIORef $ AppState (0, 1) emptyLString M.empty [] Nothing [] []
   run 8000 $ serve api $ server st
 
 (reqPush :<|> reqPull :<|> reqCreate :<|> reqPrint :<|> reqTickets) = client api
