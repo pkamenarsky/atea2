@@ -1,13 +1,14 @@
 module Logoot where
 
-import Control.Arrow
+import           Control.Arrow
 
-import Data.Algorithm.Diff
+import           Data.Algorithm.Diff
 
-import Data.Function
-import Data.Ord
-import Data.Maybe
-import Data.List
+import           Data.Function
+import           Data.Ord
+import qualified Data.Map             as M
+import           Data.Maybe
+import           Data.List
 
 import Debug.Trace
 
@@ -23,14 +24,23 @@ type Id = (Loc, Site)
 
 type Pos = ([Id], Counter)
 
-type LChar = (Char, Pos)
+type LChar = (Char, Pos, (Pos, Pos))
 
-type LString = ([LChar], [Op])
+type LString = ([LChar], [Op], M.Map Pos Pos)
+-- type LString = ([LChar], [Op])
 
 type LFile = (LString, Clock)
 
 data Op = Ins LChar | Del LChar deriving (Read, Show)
 
+fst3 :: (a, b, c) -> a
+fst3 (x, _, _) = x
+
+snd3 :: (a, b, c) -> b
+snd3 (_, y, _) = y
+
+trd3 :: (a, b, c) -> c
+trd3 (_, _, z) = z
 
 beginning :: Pos
 beginning = ([(0, 0)], 0)
@@ -51,16 +61,15 @@ clkSite :: Clock -> Int
 clkSite = fst
 
 emptyLString :: LString
--- emptyLString = ([('.', beginning), ('.', end)], [])
-emptyLString = ([], [])
+emptyLString = ([], [], M.empty)
 
 emptyLFile :: Clock -> LFile
 emptyLFile cl = (emptyLString, cl)
 
 showLString :: LString -> String
-showLString (cs, _) = map fst
-                    $ sortBy (comparing snd)
-                    $ filter (\(_, x) -> x /= beginning && x /= end) cs
+showLString (cs, _, _) = map fst3
+                    $ sortBy (comparing snd3)
+                    $ filter (\(_, x, _) -> x /= beginning && x /= end) cs
 
 posBetween :: Clock -> Pos -> Pos -> (Pos, Clock)
 posBetween (s, h) (p1, h1) (p2, h2) = ((bet p1 p2, h), (s, h + 1))
@@ -84,15 +93,15 @@ posBetween (s, h) (p1, h1) (p2, h2) = ((bet p1 p2, h), (s, h + 1))
 
 reverseIns :: Op -> Op
 reverseIns (Ins c) = (Del c)
-reverseIns (Del c) = (Del c)
+reverseIns (Del c) = (Ins c)
 
 integrate :: [Op] -> LString -> LString
-integrate ops (cs, sops) = {--(\x -> trace ("INT: " ++ show ops ++ "\nSOPS" ++ show sops) x) $--} go (ops ++ sops) (cs, [])
+integrate ops (cs, sops, dups) = {--(\x -> trace ("INT: " ++ show ops ++ "\nSOPS" ++ show sops) x) $--} go (ops ++ sops) (cs, [], dups)
   where
     go [] str     = str
-    go (op:ops) (cs, sops)
-      | (cs', Nothing)  <- r = go ops (cs', sops)
-      | (cs', Just op') <- r = go ops (cs', op' : sops)
+    go (op:ops) (cs, sops, dups)
+      | (cs', Nothing)  <- r = go ops (cs', sops, dups)
+      | (cs', Just op') <- r = go ops (cs', op' : sops, dups)
       where
         r = go' op cs
 
@@ -100,13 +109,13 @@ integrate ops (cs, sops) = {--(\x -> trace ("INT: " ++ show ops ++ "\nSOPS" ++ s
         go' op@(Del c) str
           | isJust $ find (==c) str = (delete c str, Nothing)
           | otherwise               = (str, Just op)
-        go' op@(Ins c@(_, (p, _))) str
+        go' op@(Ins c@(_, (p, _), _)) str
           -- | trace ("OP: " ++ show op ++ ", R: " ++ show p) False = undefined
-          | isJust $ find ((==p) . fst . snd) str = (str, Just op) --(str, Just op)
+          | isJust $ find ((==p) . fst . snd3) str = (str, Just op) --(str, Just op)
           | otherwise                             = (c : str, Nothing)
 
 diffLString :: Clock -> String -> LString -> ([Op], Clock)
-diffLString inCl new (old, _) = go inCl diff''
+diffLString inCl new (old, _, _) = go inCl diff''
   where
     go cl []                    = ([], cl)
     go cl ((_, Both c _, _):cs) = go cl cs
@@ -114,7 +123,7 @@ diffLString inCl new (old, _) = go inCl diff''
     go cl ((l, Second c, r):cs) = first (outOps ++ ) $ go outCl cs
       where
         (outOps, (_, outCl)) = ins npos ncl' (last $ arr l) c
-        ((nids, _), ncl) = posBetween cl (snd $ last $ arr l) (snd $ head $ arr r)
+        ((nids, _), ncl) = posBetween cl (snd3 $ last $ arr l) (snd3 $ head $ arr r)
         ncl' = incClock ncl
         npos = (nids ++ [(0, 0)], clkCnt ncl')
 
@@ -123,21 +132,21 @@ diffLString inCl new (old, _) = go inCl diff''
 
         ins :: Pos -> Clock -> LChar -> [LChar] -> ([Op], (Pos, Clock))
         ins pos cl' p [] = ([], (pos, cl'))
-        ins pos cl' p@(_, before) ((chr, _):cs) = (Ins (chr, pos'):ops, (pos'', cl'''))
+        ins pos cl' p@(_, before, _) ((chr, _, _):cs) = (Ins (chr, pos', undefined):ops, (pos'', cl'''))
           where
-            (_, after) = (head $ arr r)
+            (_, after, _) = (head $ arr r)
             (pos', cl'') = newpos pos cl'
-            (ops, (pos'', cl''')) = ins pos' cl'' (chr, pos) cs
+            (ops, (pos'', cl''')) = ins pos' cl'' (chr, pos, undefined) cs
 
     arr (Both c _) = c
     arr (First c)  = c
     arr (Second c) = c
 
-    diff = getGroupedDiffBy ((==) `on` fst)
-                            (sortBy (comparing snd) old)
-                            (map (id &&& const beginning) new)
-    diff' = Both [('.', beginning)] [('.', beginning)] : diff
-         ++ [Both [('.', end)] [('.', end)]]
+    diff = getGroupedDiffBy ((==) `on` fst3)
+                            (sortBy (comparing snd3) old)
+                            (map (\x -> (x, beginning, undefined)) new)
+    diff' = Both [('.', beginning, (beginning, end))] [('.', beginning, (beginning, end))] : diff
+         ++ [Both [('.', end, (beginning, end))] [('.', end, (beginning, end))]]
     diff'' = zip3 diff' (tail diff') (tail $ tail diff')
 
 test :: String

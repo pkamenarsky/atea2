@@ -17,7 +17,12 @@ data RepoOp
   | UpdateFile FileHandle [Op]
   deriving (Show)
 
+data Branch = Branch
+  { brName  :: T.Text
+  , brOpLog :: [RepoOp]
+  } deriving (Show)
+
 data Repo = Repo
-  { rpOpLog :: [RepoOp]
-  , rpFiles :: [File]
+  { rpBranches :: [Branch]
+  , rpFiles    :: [File]
   } deriving (Show)
