@@ -11,7 +11,13 @@ data File = File
   , fContent  :: LString
   } deriving (Show)
 
+data RepoOp
+  = CreateFile FileHandle
+  | DeleteFile FileHandle
+  | UpdateFile FileHandle [Op]
+  deriving (Show)
+
 data Repo = Repo
-  { rpOpLog :: [(FileHandle, [Op])]
+  { rpOpLog :: [RepoOp]
   , rpFiles :: [File]
   } deriving (Show)
