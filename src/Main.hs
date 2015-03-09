@@ -29,6 +29,7 @@ import           Servant.Server
 import           GHC.Generics
 
 import           Cors
+import           DVCS
 import           Logoot
 import           Test
 import           Ticket

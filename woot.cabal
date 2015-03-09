@@ -19,6 +19,7 @@ executable atea
   main-is:             Main.hs
   -- exposed-modules:     Woot
   other-modules:       Woot,
+                       DVCS,
                        Test
   -- other-extensions:    
   build-depends:       base >=4.7 && <4.8,
@@ -37,6 +38,7 @@ executable atea
                        servant-client,
                        servant-server,
                        strict,
+                       text,
                        time,
                        transformers,
                        wai,
