@@ -79,13 +79,13 @@ converge f a | a == a'   = a
   where a' = f a
 
 groupDups :: [LChar] -> [LChar]
-groupDups = map head . converge groupDups' . map (:[])
+groupDups = map head . (\x -> trace (show x) x) . converge groupDups' . map (:[])
   where
     groupDups' :: [[LChar]] -> [[LChar]]
-    groupDups' cs = fdups'
+    groupDups' cs = undup $ fdups $ sortBy (\x y -> (fst $ head x) `cmp` (fst $ head y)) ldups
       where
         cmp (c, _,  (p, n)) (c', _, (p', n')) = (compare c c') `mappend` (compare p p') `mappend` (compare n n')
-        eq (c, _,  (p, n)) (c', _, (p', n'))  = c == c' && p == p' && n == n'
+        eq  (c, _,  (p, n)) (c', _, (p', n')) = c == c' && isJust p && isJust n && p == p' && n == n'
 
         ndups = zip [0..] cs
 
@@ -93,21 +93,24 @@ groupDups = map head . converge groupDups' . map (:[])
         findup ([(maxBound, 0)], 0) = Just (maxBound :: Int)
         findup idx = fst `fmap` find (\(i, cs) -> any ((== idx) . snd3) cs) ndups
 
-        -- ldups = (\x -> trace ("fdups: " ++ show x) x)
         ldups =
-          [ ((c, pos, (findup p, findup n)), (p, n))
+          [ [ ((c, pos, (findup p, findup n)), (p, n)) | (c, pos, (p, n)) <- ndups' ]
           | (_, ndups')      <- ndups
-          , (c, pos, (p, n)) <- ndups'
           ]
 
-        fdups = groupBy (eq `on` fst) $ sortBy (comparing fst) ldups
-        fdups' = map (map (\((x, pos, _), pn) -> (x, pos, pn))) fdups
+        -- fdups  = groupBy (eq `on` fst) $ sortBy (comparing fst) ldups
+        fdups []        = []
+        fdups [d]       = [d]
+        fdups (d:d':ds) = if any (uncurry (eq `on` fst)) (pairs (d ++ d')) then fdups ((d ++ d'):ds) else d:fdups (d':ds)
+
+        undup = map (map (\((x, pos, _), pn) -> (x, pos, pn)))
 
 showLString :: LString -> String
 showLString (cs, _, _) = map fst3
                     $ sortBy (comparing snd3)
                     $ filter (\(_, x, _) -> x /= beginning && x /= end)
                     $ groupDups cs
+--                     $ cs
 
 posBetween :: Clock -> Pos -> Pos -> (Pos, Clock)
 posBetween (s, h) (p1, h1) (p2, h2) = ((bet p1 p2, h), (s, h + 1))
@@ -193,11 +196,11 @@ test = showLString r
   where
     (op1, c1) = diffLString (0, 0) "1234" emptyLString
     t1 = integrate op1 emptyLString
-    (op1', c1') = diffLString (0, 0) "adasdasd" t1
+    (op1', c1') = diffLString (0, 0) "123woot4" t1
 
     (op2, c2) = diffLString (1, 0) "1234" emptyLString
     t2 = integrate op2 emptyLString
-    (op2', c2') = diffLString (0, 0) "cc866cc" t2
+    (op2', c2') = diffLString (0, 0) "123woot4" t2
 
-    -- r = integrate op1 $ integrate op1' $ integrate op2 $ integrate op2' emptyLString
-    r = integrate op2 $ integrate op1 emptyLString
+    r = integrate op1 $ integrate op1' $ integrate op2 $ integrate op2' emptyLString
+    -- r = integrate op1' $ integrate op2 $ integrate op1 emptyLString
