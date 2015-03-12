@@ -122,7 +122,7 @@ diffLString inCl new (old, _, _) = go inCl diff''
     go cl ((_, First c, _):cs)  = first (map Del c ++) $ go cl cs
     go cl ((l, Second c, r):cs) = first (outOps ++ ) $ go outCl cs
       where
-        (outOps, (_, outCl)) = ins npos ncl' (last $ arr l) c
+        (outOps, (_, outCl)) = ins (Just $ snd3 $ last $ arr l) npos ncl' c
         ((nids, _), ncl) = posBetween cl (snd3 $ last $ arr l) (snd3 $ head $ arr r)
         ncl' = incClock ncl
         npos = (nids ++ [(0, 0)], clkCnt ncl')
@@ -130,13 +130,14 @@ diffLString inCl new (old, _, _) = go inCl diff''
         newpos :: Pos -> Clock -> (Pos, Clock)
         newpos (nids, _) cl'@(s, h) = ((init nids ++ [(h {--randomize loc--}, s)], h), incClock cl')
 
-        ins :: Pos -> Clock -> LChar -> [LChar] -> ([Op], (Pos, Clock))
-        ins pos cl' p [] = ([], (pos, cl'))
-        ins pos cl' p@(_, before, _) ((chr, _, _):cs) = (Ins (chr, pos', undefined):ops, (pos'', cl'''))
+        ins :: Maybe Pos -> Pos -> Clock -> [LChar] -> ([Op], (Pos, Clock))
+        ins _ pos cl' [] = ([], (pos, cl'))
+        ins mpos pos cl' ((chr, _, _):cs) = (Ins (chr, pos', (cpos, after)):ops, (pos'', cl'''))
           where
+            cpos = fromMaybe pos mpos
             (_, after, _) = (head $ arr r)
             (pos', cl'') = newpos pos cl'
-            (ops, (pos'', cl''')) = ins pos' cl'' (chr, pos, undefined) cs
+            (ops, (pos'', cl''')) = ins Nothing pos' cl'' cs
 
     arr (Both c _) = c
     arr (First c)  = c
@@ -150,7 +151,7 @@ diffLString inCl new (old, _, _) = go inCl diff''
     diff'' = zip3 diff' (tail diff') (tail $ tail diff')
 
 test :: String
-test = showLString r
+test = show r
   where
     (op1, c1) = diffLString (0, 0) "adasdasd" emptyLString
     t1 = integrate op1 emptyLString
@@ -160,4 +161,5 @@ test = showLString r
     t2 = integrate op2 emptyLString
     (op2', c2') = diffLString (0, 0) "cc866cc" t2
 
-    r = integrate op1 $ integrate op1' $ integrate op2 $ integrate op2' emptyLString
+    -- r = integrate op1 $ integrate op1' $ integrate op2 $ integrate op2' emptyLString
+    r = integrate op1 emptyLString
