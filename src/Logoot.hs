@@ -66,10 +66,32 @@ emptyLString = ([], [], M.empty)
 emptyLFile :: Clock -> LFile
 emptyLFile cl = (emptyLString, cl)
 
+groupDups :: [LChar] -> [LChar]
+groupDups cs = map ((\(p, c, _) -> (p, c, undefined)) . head) fdups
+  where
+    dups = nub $ concat
+      [ if c == c' && p == p' && n == n' then [[ch, ch']] else [[ch], [ch']]
+      | ch@ (c, _,  (p, n))   <- cs
+      , ch'@(c', _, (p', n')) <- cs
+      ]
+    ndups = zip [0..] dups
+    findup idx = fst `fmap` find (\(i, cs) -> any ((== idx) . snd3) cs) ndups
+    ldups =
+      [ (c, pos, (findup p, findup n))
+      | (_, ndups')      <- ndups
+      , (c, pos, (p, n)) <- ndups'
+      ]
+    fdups = nub $ concat
+      [ if isJust p && isJust n && p == p' && n == n' then [[c, c']] else [[c], [c']]
+      | c@  (_, _, (p, n))    <- ldups
+      , c'@ (_, _, (p', n'))  <- ldups
+      ]
+
 showLString :: LString -> String
 showLString (cs, _, _) = map fst3
                     $ sortBy (comparing snd3)
-                    $ filter (\(_, x, _) -> x /= beginning && x /= end) cs
+                    $ filter (\(_, x, _) -> x /= beginning && x /= end)
+                    $ groupDups cs
 
 posBetween :: Clock -> Pos -> Pos -> (Pos, Clock)
 posBetween (s, h) (p1, h1) (p2, h2) = ((bet p1 p2, h), (s, h + 1))
@@ -151,7 +173,7 @@ diffLString inCl new (old, _, _) = go inCl diff''
     diff'' = zip3 diff' (tail diff') (tail $ tail diff')
 
 test :: String
-test = show r
+test = showLString r
   where
     (op1, c1) = diffLString (0, 0) "adasdasd" emptyLString
     t1 = integrate op1 emptyLString
