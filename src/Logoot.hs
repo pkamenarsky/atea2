@@ -1,3 +1,5 @@
+{-# LANGUAGE TupleSections #-}
+
 module Logoot where
 
 import           Control.Arrow
@@ -8,6 +10,7 @@ import           Data.Function
 import           Data.Ord
 import qualified Data.Map             as M
 import           Data.Maybe
+import           Data.Monoid          (mappend)
 import           Data.List
 
 import Debug.Trace
@@ -66,26 +69,39 @@ emptyLString = ([], [], M.empty)
 emptyLFile :: Clock -> LFile
 emptyLFile cl = (emptyLString, cl)
 
+pairs :: [a] -> [(a, a)]
+pairs [] = []
+pairs (x:xs) = map (x,) xs ++ pairs xs
+
+converge :: Eq a => (a -> a) -> a -> a
+converge f a | a == a'   = a
+             | otherwise = converge f a'
+  where a' = f a
+
 groupDups :: [LChar] -> [LChar]
-groupDups cs = map ((\(p, c, _) -> (p, c, undefined)) . head) fdups
+groupDups = map head . converge groupDups' . map (:[])
   where
-    dups = nub $ concat
-      [ if c == c' && p == p' && n == n' then [[ch, ch']] else [[ch], [ch']]
-      | ch@ (c, _,  (p, n))   <- cs
-      , ch'@(c', _, (p', n')) <- cs
-      ]
-    ndups = zip [0..] dups
-    findup idx = fst `fmap` find (\(i, cs) -> any ((== idx) . snd3) cs) ndups
-    ldups =
-      [ (c, pos, (findup p, findup n))
-      | (_, ndups')      <- ndups
-      , (c, pos, (p, n)) <- ndups'
-      ]
-    fdups = nub $ concat
-      [ if isJust p && isJust n && p == p' && n == n' then [[c, c']] else [[c], [c']]
-      | c@  (_, _, (p, n))    <- ldups
-      , c'@ (_, _, (p', n'))  <- ldups
-      ]
+    groupDups' :: [[LChar]] -> [[LChar]]
+    groupDups' cs = fdups'
+      where
+        cmp (c, _,  (p, n)) (c', _, (p', n')) = (compare c c') `mappend` (compare p p') `mappend` (compare n n')
+        eq (c, _,  (p, n)) (c', _, (p', n'))  = c == c' && p == p' && n == n'
+
+        ndups = zip [0..] cs
+
+        findup ([(0, 0)], 0) = Just (minBound :: Int)
+        findup ([(maxBound, 0)], 0) = Just (maxBound :: Int)
+        findup idx = fst `fmap` find (\(i, cs) -> any ((== idx) . snd3) cs) ndups
+
+        -- ldups = (\x -> trace ("fdups: " ++ show x) x)
+        ldups =
+          [ ((c, pos, (findup p, findup n)), (p, n))
+          | (_, ndups')      <- ndups
+          , (c, pos, (p, n)) <- ndups'
+          ]
+
+        fdups = groupBy (eq `on` fst) $ sortBy (comparing fst) ldups
+        fdups' = map (map (\((x, pos, _), pn) -> (x, pos, pn))) fdups
 
 showLString :: LString -> String
 showLString (cs, _, _) = map fst3
@@ -175,13 +191,13 @@ diffLString inCl new (old, _, _) = go inCl diff''
 test :: String
 test = showLString r
   where
-    (op1, c1) = diffLString (0, 0) "adasdasd" emptyLString
+    (op1, c1) = diffLString (0, 0) "1234" emptyLString
     t1 = integrate op1 emptyLString
-    (op1', c1') = diffLString (0, 0) "ad55dasd" t1
+    (op1', c1') = diffLString (0, 0) "adasdasd" t1
 
-    (op2, c2) = diffLString (1, 0) "766" emptyLString
+    (op2, c2) = diffLString (1, 0) "1234" emptyLString
     t2 = integrate op2 emptyLString
     (op2', c2') = diffLString (0, 0) "cc866cc" t2
 
     -- r = integrate op1 $ integrate op1' $ integrate op2 $ integrate op2' emptyLString
-    r = integrate op1 emptyLString
+    r = integrate op2 $ integrate op1 emptyLString
