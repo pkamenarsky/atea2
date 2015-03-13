@@ -79,7 +79,7 @@ converge f a | a == a'   = a
   where a' = f a
 
 groupDups :: [LChar] -> [LChar]
-groupDups = map head . fixpos . converge groupDups' . map (:[])
+groupDups = map head . converge fixpos . converge groupDups' . map (:[])
   where
     cmp (c, _,  (p, n)) (c', _, (p', n')) = (compare c c') `mappend` (compare p p') `mappend` (compare n n')
     eq  (c, _,  (p, n)) (c', _, (p', n')) = c == c' && isJust p && isJust n && p == p' && n == n'
