@@ -79,36 +79,56 @@ converge f a | a == a'   = a
   where a' = f a
 
 groupDups :: [LChar] -> [LChar]
-groupDups = (\x -> trace (show x) x) . map head . (\x -> trace (show x) x) . converge groupDups' . map (:[])
+groupDups = map head . fixpos . converge groupDups' . map (:[])
   where
+    cmp (c, _,  (p, n)) (c', _, (p', n')) = (compare c c') `mappend` (compare p p') `mappend` (compare n n')
+    eq  (c, _,  (p, n)) (c', _, (p', n')) = c == c' && isJust p && isJust n && p == p' && n == n'
+
+    match d d' = any (\[x, x'] -> fst x `eq` fst x') $ sequence [d, d']
+
+    findup _ ([(0, 0)], 0) = Just (minBound :: Int)
+    findup _ ([(maxBound, 0)], 0) = Just (maxBound :: Int)
+    findup ndups idx = fst `fmap` find (\(i, cs) -> any ((== idx) . snd3) cs) ndups
+
+    dupmaybe x f m | m == Just minBound = x
+                   | m == Just maxBound = x
+                   | otherwise          = maybe x f m
+
+    fixpos cs' =
+      [ [ (c, pos', (p, n))
+        | (c, pos, (p, n)) <- dups'
+        , let dp = findup dups p
+        , let dn = findup dups n
+        , let pos' | dp == Just minBound = pos
+                   | dp == Just maxBound = pos
+                   | dn == Just minBound = pos
+                   | dn == Just maxBound = pos
+                   | otherwise = case (dp, dn) of
+                  (Just dp', Just dn') -> fst $ posBetween ((maxBound - 10), 0)
+                                                     (snd3 $ head $ snd $ (dups !! dp'))
+                                                     (snd3 $ head $ snd $ (dups !! dn'))
+                  otherwise -> pos
+        ]
+      | (_, dups')      <- dups
+      ]
+      where
+        dups = zip [0..] cs'
+
     groupDups' :: [[LChar]] -> [[LChar]]
     groupDups' cs = undup $ fdups $ ldups
       where
-        cmp (c, _,  (p, n)) (c', _, (p', n')) = (compare c c') `mappend` (compare p p') `mappend` (compare n n')
-        eq  (c, _,  (p, n)) (c', _, (p', n')) = c == c' && isJust p && isJust n && p == p' && n == n'
-
         ndups = zip [0..] cs
-
-        findup ([(0, 0)], 0) = Just (minBound :: Int)
-        findup ([(maxBound, 0)], 0) = Just (maxBound :: Int)
-        findup idx = fst `fmap` find (\(i, cs) -> any ((== idx) . snd3) cs) ndups
-
-        dupmaybe p _ (Just minBound) = p
-        dupmaybe p _ (Just maxBound) = p
-        dupmaybe x f m = maybe x f m
 
         ldups =
           [ [ ((c, pos, (dp, dn)), (p', n'))
             | (c, pos, (p, n)) <- ndups'
-            , let dp = findup p
+            , let dp = findup ndups p
             , let p' = dupmaybe p (snd3 . head . snd . (ndups !!)) dp
-            , let dn = findup n
+            , let dn = findup ndups n
             , let n' = dupmaybe n (snd3 . head . snd . (ndups !!)) dn
             ]
           | (_, ndups')      <- ndups
           ]
-
-        match d d' = any (\[x, x'] -> fst x `eq` fst x') $ sequence [d, d']
 
         fdups [] = []
         fdups (d:ds) | Just m' <- m = fdups $ (sortBy (comparing (snd3 . fst)) $ d ++ m'):(delete m' ds)
