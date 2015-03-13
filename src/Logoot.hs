@@ -98,10 +98,13 @@ groupDups = map head . (\x -> trace (show x) x) . converge groupDups' . map (:[]
           | (_, ndups')      <- ndups
           ]
 
-        -- fdups  = groupBy (eq `on` fst) $ sortBy (comparing fst) ldups
-        fdups []        = []
-        fdups [d]       = [d]
-        fdups (d:d':ds) = if any (uncurry (eq `on` fst)) (pairs (d ++ d')) then fdups ((d ++ d'):ds) else d:fdups (d':ds)
+        match d d' = any (\[x, x'] -> fst x `eq` fst x') $ sequence [d, d']
+
+        fdups [] = []
+        fdups (d:ds) | Just m' <- m = fdups $ (d ++ m'):(delete m' ds)
+                     | otherwise    = d:fdups ds
+          where
+            m = find (match d) ds
 
         undup = map (map (\((x, pos, _), pn) -> (x, pos, pn)))
 
