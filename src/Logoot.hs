@@ -79,10 +79,10 @@ converge f a | a == a'   = a
   where a' = f a
 
 groupDups :: [LChar] -> [LChar]
-groupDups = map head . (\x -> trace (show x) x) . converge groupDups' . map (:[])
+groupDups = (\x -> trace (show x) x) . map head . (\x -> trace (show x) x) . converge groupDups' . map (:[])
   where
     groupDups' :: [[LChar]] -> [[LChar]]
-    groupDups' cs = undup $ fdups $ sortBy (\x y -> (fst $ head x) `cmp` (fst $ head y)) ldups
+    groupDups' cs = undup $ fdups $ ldups
       where
         cmp (c, _,  (p, n)) (c', _, (p', n')) = (compare c c') `mappend` (compare p p') `mappend` (compare n n')
         eq  (c, _,  (p, n)) (c', _, (p', n')) = c == c' && isJust p && isJust n && p == p' && n == n'
@@ -93,15 +93,25 @@ groupDups = map head . (\x -> trace (show x) x) . converge groupDups' . map (:[]
         findup ([(maxBound, 0)], 0) = Just (maxBound :: Int)
         findup idx = fst `fmap` find (\(i, cs) -> any ((== idx) . snd3) cs) ndups
 
+        dupmaybe p _ (Just minBound) = p
+        dupmaybe p _ (Just maxBound) = p
+        dupmaybe x f m = maybe x f m
+
         ldups =
-          [ [ ((c, pos, (findup p, findup n)), (p, n)) | (c, pos, (p, n)) <- ndups' ]
+          [ [ ((c, pos, (dp, dn)), (p', n'))
+            | (c, pos, (p, n)) <- ndups'
+            , let dp = findup p
+            , let p' = dupmaybe p (snd3 . head . snd . (ndups !!)) dp
+            , let dn = findup n
+            , let n' = dupmaybe n (snd3 . head . snd . (ndups !!)) dn
+            ]
           | (_, ndups')      <- ndups
           ]
 
         match d d' = any (\[x, x'] -> fst x `eq` fst x') $ sequence [d, d']
 
         fdups [] = []
-        fdups (d:ds) | Just m' <- m = fdups $ (d ++ m'):(delete m' ds)
+        fdups (d:ds) | Just m' <- m = fdups $ (sortBy (comparing (snd3 . fst)) $ d ++ m'):(delete m' ds)
                      | otherwise    = d:fdups ds
           where
             m = find (match d) ds
@@ -199,11 +209,11 @@ test = showLString r
   where
     (op1, c1) = diffLString (0, 0) "1234" emptyLString
     t1 = integrate op1 emptyLString
-    (op1', c1') = diffLString (0, 0) "123woot4" t1
+    (op1', c1') = diffLString (0, 0) "123x4" t1
 
     (op2, c2) = diffLString (1, 0) "1234" emptyLString
     t2 = integrate op2 emptyLString
-    (op2', c2') = diffLString (0, 0) "123woot4" t2
+    (op2', c2') = diffLString (0, 0) "123xy4" t2
 
     r = integrate op1 $ integrate op1' $ integrate op2 $ integrate op2' emptyLString
     -- r = integrate op1' $ integrate op2 $ integrate op1 emptyLString
