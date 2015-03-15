@@ -146,8 +146,8 @@ showLString :: LString -> String
 showLString (cs, _, _) = map fst3
                     $ sortBy (comparing snd3)
                     $ filter (\(_, x, _) -> x /= beginning && x /= end)
-                    $ groupDups cs
---                    $ cs
+--                     $ groupDups cs
+                    $ cs
 
 posBetween :: Clock -> Pos -> Pos -> (Pos, Clock)
 posBetween (s, h) (p1, h1) (p2, h2) = ((bet p1 p2, h), (s, h + 1))
@@ -223,8 +223,8 @@ diffLString inCl new (old, _, _) = go inCl diff''
 
     diff = groupDiff $ getDiffBreakOnEOLBy ((==) `on` fst3) (linesBy ((== '\n') . fst3))
     -- diff = getGroupedDiffBy ((==) `on` fst3)
-                            -- (sortBy (comparing snd3) old)
-                            (sortBy (comparing snd3) $ groupDups old)
+                            (sortBy (comparing snd3) old)
+                            -- (sortBy (comparing snd3) $ groupDups old)
                             (map (\x -> (x, beginning, (beginning, end))) new)
     diff' = Both [('.', beginning, (beginning, end))] [('.', beginning, (beginning, end))] : diff
          ++ [Both [('.', end, (beginning, end))] [('.', end, (beginning, end))]]
