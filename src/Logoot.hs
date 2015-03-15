@@ -189,6 +189,7 @@ integrate ops (cs, sops, dups) = {--(\x -> trace ("INT: " ++ show ops ++ "\nSOPS
           | otherwise               = (str, Just op)
         go' op@(Ins c@(_, (p, _), _)) str
           -- | trace ("OP: " ++ show op ++ ", R: " ++ show p) False = undefined
+          -- very slow!!!
           | isJust $ find ((==p) . fst . snd3) str = (str, Just op) --(str, Just op)
           | otherwise                             = (c : str, Nothing)
 
