@@ -221,7 +221,7 @@ diffLString inCl new (old, _, _) = go inCl diff''
     arr (First c)  = c
     arr (Second c) = c
 
-    diff = getGroupedDiffBy ((==) `on` fst3)
+    diff = groupDiff $ getDiffBreakOnEOLBy ((==) `on` fst3) (linesBy ((== '\n') . fst3))
                             -- (sortBy (comparing snd3) old)
                             (sortBy (comparing snd3) $ groupDups old)
                             (map (\x -> (x, beginning, undefined)) new)
@@ -229,10 +229,28 @@ diffLString inCl new (old, _, _) = go inCl diff''
          ++ [Both [('.', end, (beginning, end))] [('.', end, (beginning, end))]]
     diff'' = zip3 diff' (tail diff') (tail $ tail diff')
 
-getDiffBreakOnEOL :: String -> String -> [Diff Char]
-getDiffBreakOnEOL old new = go diff
+linesBy                   :: (a -> Bool) -> [a] -> [[a]]
+linesBy _ []                =  []
+-- Somehow GHC doesn't detect the selector thunks in the below code,
+-- so s' keeps a reference to the first line via the pair and we have
+-- a space leak (cf. #4334).
+-- So we need to make GHC see the selector thunks with a trick.
+linesBy eol s                 =  cons (case break eol s of
+                                    (l, s') -> (l, case s' of
+                                                    []      -> []
+                                                    _:s''   -> linesBy eol s''))
   where
-    diff = getGroupedDiff (lines old) (lines new)
+    cons ~(h, t)        =  h : t
+
+groupDiff :: Eq a => [Diff a] -> [Diff [a]]
+groupDiff = undefined
+
+getDiffBreakOnEOLBy :: Eq a => (a -> a -> Bool) -> ([a] -> [[a]]) -> [a] -> [a] -> [Diff a]
+getDiffBreakOnEOLBy cmp mkLines old new = go diff
+  where
+    diff = getGroupedDiffBy (\s s' -> all (uncurry cmp) $ zip s s')
+                            (mkLines old)
+                            (mkLines new)
 
     go [] = []
     go (First c:Second c':cs) = linediff c c' ++ go cs
