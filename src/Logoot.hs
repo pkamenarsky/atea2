@@ -242,8 +242,23 @@ linesBy eol s                 =  cons (case break eol s of
   where
     cons ~(h, t)        =  h : t
 
-groupDiff :: Eq a => [Diff a] -> [Diff [a]]
-groupDiff = undefined
+groupDiff :: [Diff t] -> [Diff [t]]
+groupDiff diff = go diff
+    where go (First x  : xs) = let (fs, rest) = goFirsts  xs in First  (x:fs)     : go rest
+          go (Second x : xs) = let (fs, rest) = goSeconds xs in Second (x:fs)     : go rest
+          go (Both x y : xs) = let (fs, rest) = goBoth    xs
+                                   (fxs, fys) = unzip fs
+                               in Both (x:fxs) (y:fys) : go rest
+          go [] = []
+
+          goFirsts  (First x  : xs) = let (fs, rest) = goFirsts  xs in (x:fs, rest)
+          goFirsts  xs = ([],xs)
+
+          goSeconds (Second x : xs) = let (fs, rest) = goSeconds xs in (x:fs, rest)
+          goSeconds xs = ([],xs)
+
+          goBoth    (Both x y : xs) = let (fs, rest) = goBoth xs    in ((x,y):fs, rest)
+          goBoth    xs = ([],xs)
 
 getDiffBreakOnEOLBy :: Eq a => (a -> a -> Bool) -> ([a] -> [[a]]) -> [a] -> [a] -> [Diff a]
 getDiffBreakOnEOLBy cmp mkLines old new = go diff
