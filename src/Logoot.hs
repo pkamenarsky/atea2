@@ -222,9 +222,10 @@ diffLString inCl new (old, _, _) = go inCl diff''
     arr (Second c) = c
 
     diff = groupDiff $ getDiffBreakOnEOLBy ((==) `on` fst3) (linesBy ((== '\n') . fst3))
+    -- diff = getGroupedDiffBy ((==) `on` fst3)
                             -- (sortBy (comparing snd3) old)
                             (sortBy (comparing snd3) $ groupDups old)
-                            (map (\x -> (x, beginning, undefined)) new)
+                            (map (\x -> (x, beginning, (beginning, end))) new)
     diff' = Both [('.', beginning, (beginning, end))] [('.', beginning, (beginning, end))] : diff
          ++ [Both [('.', end, (beginning, end))] [('.', end, (beginning, end))]]
     diff'' = zip3 diff' (tail diff') (tail $ tail diff')
@@ -260,7 +261,7 @@ groupDiff diff = go diff
           goBoth    (Both x y : xs) = let (fs, rest) = goBoth xs    in ((x,y):fs, rest)
           goBoth    xs = ([],xs)
 
-getDiffBreakOnEOLBy :: Eq a => (a -> a -> Bool) -> ([a] -> [[a]]) -> [a] -> [a] -> [Diff a]
+getDiffBreakOnEOLBy :: (Eq a, Show a) => (a -> a -> Bool) -> ([a] -> [[a]]) -> [a] -> [a] -> [Diff a]
 getDiffBreakOnEOLBy cmp mkLines old new = go diff
   where
     diff = getGroupedDiffBy (\s s' -> all (uncurry cmp) $ zip s s')
@@ -269,24 +270,26 @@ getDiffBreakOnEOLBy cmp mkLines old new = go diff
 
     go [] = []
     go (First c:Second c':cs) = linediff c c' ++ go cs
+    go (Second c:First c':cs) = linediff c' c ++ go cs
     go (Both c c':cs) = concat (zipWith (zipWith Both) c c') ++ go cs
     go (First c:cs) = concatMap (map First) c ++ go cs
     go (Second c:cs) = concatMap (map Second) c ++ go cs
 
     linediff ls [] = concatMap (map First) ls
     linediff [] rs = concatMap (map Second) rs
-    linediff (l:ls) (l':ls') = getDiff l l' ++ linediff ls ls'
+    linediff (l:ls) (l':ls') = getDiffBy cmp l l' ++ linediff ls ls'
 
 test :: String
 test = showLString r
   where
     (op1, c1) = diffLString (0, 0) "1234" emptyLString
     t1 = integrate op1 emptyLString
-    (op1', c1') = diffLString (0, 0) "123x4" t1
+    (op1', c1') = diffLString (0, 0) "xx 1234" t1
 
-    (op2, c2) = diffLString (1, 0) "1234" emptyLString
+    (op2, c2) = diffLString (1, 0) "" emptyLString
     t2 = integrate op2 emptyLString
-    (op2', c2') = diffLString (0, 0) "123xy4" t2
+    -- t2 = integrate op1 emptyLString
+    (op2', c2') = diffLString (0, 0) "1234 yy" t2
 
     r = integrate op1 $ integrate op1' $ integrate op2 $ integrate op2' emptyLString
     -- r = integrate op1' $ integrate op2 $ integrate op1 emptyLString
