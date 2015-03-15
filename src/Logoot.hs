@@ -236,9 +236,9 @@ linesBy _ []                =  []
 -- a space leak (cf. #4334).
 -- So we need to make GHC see the selector thunks with a trick.
 linesBy eol s                 =  cons (case break eol s of
-                                    (l, s') -> (l, case s' of
-                                                    []      -> []
-                                                    _:s''   -> linesBy eol s''))
+                                    (l, s') -> case s' of
+                                                  []      -> (l, [])
+                                                  e:s''   -> (l ++ [e], linesBy eol s''))
   where
     cons ~(h, t)        =  h : t
 
