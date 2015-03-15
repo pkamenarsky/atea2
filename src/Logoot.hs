@@ -78,8 +78,12 @@ converge f a | a == a'   = a
              | otherwise = converge f a'
   where a' = f a
 
+ftrace :: Show x => String -> x -> x
+-- ftrace str x = trace (str ++ show x) x
+ftrace str = id
+
 groupDups :: [LChar] -> [LChar]
-groupDups = map head . converge fixpos . converge groupDups' . map (:[])
+groupDups = map head . {-- converge fixpos .--} ftrace "conv: " .  converge groupDups' . map (:[])
   where
     cmp (c, _,  (p, n)) (c', _, (p', n')) = (compare c c') `mappend` (compare p p') `mappend` (compare n n')
     eq  (c, _,  (p, n)) (c', _, (p', n')) = c == c' && isJust p && isJust n && p == p' && n == n'
@@ -143,7 +147,7 @@ showLString (cs, _, _) = map fst3
                     $ sortBy (comparing snd3)
                     $ filter (\(_, x, _) -> x /= beginning && x /= end)
                     $ groupDups cs
---                     $ cs
+--                    $ cs
 
 posBetween :: Clock -> Pos -> Pos -> (Pos, Clock)
 posBetween (s, h) (p1, h1) (p2, h2) = ((bet p1 p2, h), (s, h + 1))
@@ -218,11 +222,27 @@ diffLString inCl new (old, _, _) = go inCl diff''
     arr (Second c) = c
 
     diff = getGroupedDiffBy ((==) `on` fst3)
-                            (sortBy (comparing snd3) old)
+                            -- (sortBy (comparing snd3) old)
+                            (sortBy (comparing snd3) $ groupDups old)
                             (map (\x -> (x, beginning, undefined)) new)
     diff' = Both [('.', beginning, (beginning, end))] [('.', beginning, (beginning, end))] : diff
          ++ [Both [('.', end, (beginning, end))] [('.', end, (beginning, end))]]
     diff'' = zip3 diff' (tail diff') (tail $ tail diff')
+
+getDiffBreakOnEOL :: String -> String -> [Diff Char]
+getDiffBreakOnEOL old new = go diff
+  where
+    diff = getGroupedDiff (lines old) (lines new)
+
+    go [] = []
+    go (First c:Second c':cs) = linediff c c' ++ go cs
+    go (Both c c':cs) = concat (zipWith (zipWith Both) c c') ++ go cs
+    go (First c:cs) = concatMap (map First) c ++ go cs
+    go (Second c:cs) = concatMap (map Second) c ++ go cs
+
+    linediff ls [] = concatMap (map First) ls
+    linediff [] rs = concatMap (map Second) rs
+    linediff (l:ls) (l':ls') = getDiff l l' ++ linediff ls ls'
 
 test :: String
 test = showLString r
