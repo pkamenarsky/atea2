@@ -29,6 +29,7 @@ executable atea
                        Diff,
                        either,
                        filepath,
+                       hashable,
                        http-types,
                        mtl,
                        -- orgmode-parse,

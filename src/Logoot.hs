@@ -222,8 +222,10 @@ diffLString inCl new (old, _, _) = go inCl diff''
     arr (First c)  = c
     arr (Second c) = c
 
-    diff = groupDiff $ getDiffBreakOnEOLBy ((==) `on` fst3) (linesBy ((== '\n') . fst3))
-    -- diff = getGroupedDiffBy ((==) `on` fst3)
+    cheq c c' = if c == '\n' && c' == '\n' then False else c == c'
+    -- diff = groupDiff $ getDiffBreakOnEOLBy ((==) `on` fst3) (linesBy ((\c -> c == '\n' || c == ' ') . fst3))
+    diff = getGroupedDiffBy ((==) `on` fst3)
+    -- diff = getGroupedDiffBy (cheq `on` fst3)
                             (sortBy (comparing snd3) old)
                             -- (sortBy (comparing snd3) $ groupDups old)
                             (map (\x -> (x, beginning, (beginning, end))) new)
