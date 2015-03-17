@@ -9,6 +9,8 @@ import           Data.Function
 
 import           Data.List
 
+import Debug.Trace
+
 diff :: ([a] -> Int) -> (a -> a -> Bool) -> [[a]] -> [[a]] -> [Diff a]
 diff hash cmp old new = go hashdiff
   where
@@ -40,10 +42,14 @@ diff hash cmp old new = go hashdiff
 
 data BDiff a = Ins a | Del a | Copy [a] deriving Show
 
-bdiff :: Eq a => [a] -> [a] -> [BDiff a]
+ftrace :: Show x => String -> x -> x
+ftrace str x = trace (str ++ show x) x
+-- ftrace str = id
+
+bdiff :: (Eq a, Show a) => [a] -> [a] -> [BDiff a]
 bdiff old new = bdiff' (map (, True) old) new
   where
-    bdiff' old []                     = map (Del . fst) $ filter (not . snd) old
+    bdiff' old []                     = map (Del . fst) $ filter snd $ old
     bdiff' old new@(x:xs) | null pr   = Ins x : bdiff' old xs
                           | otherwise = Copy pr : bdiff' old' (drop (length pr) new)
       where
@@ -56,5 +62,5 @@ bdiff old new = bdiff' (map (, True) old) new
 
         findInfix _ _ [] = Nothing
         findInfix inf pr sf@(x:xs)
-          | isPrefixOf (map (, True) inf) sf = Just (pr ++ (map (, False) inf) ++ sf)
+          | isPrefixOf (map (, True) inf) sf = Just (pr ++ (map (, False) inf) ++ drop (length inf) sf)
           | otherwise                        = findInfix inf (pr ++ [x]) xs
