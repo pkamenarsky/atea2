@@ -49,7 +49,7 @@ ftrace str x = trace (str ++ show x) x
 bdiff :: (Eq a, Show a) => [a] -> [a] -> [BDiff a]
 bdiff old new = bdiff' (map (, True) old) new
   where
-    bdiff' old []                     = map (Del . fst) $ filter snd $ old
+    bdiff' old []                     = map (Del . fst) $ filter snd old
     bdiff' old new@(x:xs) | null pr   = Ins x : bdiff' old xs
                           | otherwise = Copy pr : bdiff' old' (drop (length pr) new)
       where
@@ -62,5 +62,6 @@ bdiff old new = bdiff' (map (, True) old) new
 
         findInfix _ _ [] = Nothing
         findInfix inf pr sf@(x:xs)
-          | isPrefixOf (map (, True) inf) sf = Just (pr ++ (map (, False) inf) ++ drop (length inf) sf)
+          -- | isPrefixOf (map (, True) inf) sf = Just (pr ++ (map (, False) inf) ++ drop (length inf) sf)
+          | isPrefixOf inf (map fst sf) = Just (pr ++ (map (, False) inf) ++ drop (length inf) sf)
           | otherwise                        = findInfix inf (pr ++ [x]) xs
