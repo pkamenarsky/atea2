@@ -41,12 +41,20 @@ diff hash cmp old new = go hashdiff
 data BDiff a = Ins a | Copy [a] deriving Show
 
 bdiff :: Eq a => [a] -> [a] -> [BDiff a]
-bdiff _ []           = []
-bdiff old new@(x:xs) | null pr = Ins x : bdiff old xs
-                     | otherwise = Copy pr : bdiff old (drop (length pr) new)
+bdiff old new = bdiff' (map (, True) old) new
   where
-    pr = maxPrefix new old
-    maxPrefix [] _                      = []
-    maxPrefix pr str | isInfixOf pr str = pr
-                     | otherwise        = maxPrefix (init pr) str
+    bdiff' _ []           = []
+    bdiff' old new@(x:xs) | null pr = Ins x : bdiff' old xs
+                         | otherwise = Copy pr : bdiff' old' (drop (length pr) new)
+      where
+        (pr, old') = maxPrefix new old
 
+        maxPrefix [] str             = ([], str)
+        maxPrefix pr str | Just str' <- findInfix pr [] str
+                                     = (pr, str')
+                         | otherwise = maxPrefix (init pr) str
+
+        findInfix _ _ [] = Nothing
+        findInfix inf pr sf@(x:xs)
+          | isPrefixOf (map (, True) inf) sf = Just (pr ++ (map (, False) inf) ++ sf)
+          | otherwise         = findInfix inf (pr ++ [x]) xs
