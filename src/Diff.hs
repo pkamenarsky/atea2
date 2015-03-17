@@ -38,14 +38,14 @@ diff hash cmp old new = go hashdiff
           | [lnNew, lnOld] <- sequence [map fst ls', map fst ls]
           ]
 
-data BDiff a = Del a | Copy [a] deriving Show
+data BDiff a = Ins a | Copy [a] deriving Show
 
 bdiff :: Eq a => [a] -> [a] -> [BDiff a]
-bdiff [] _           = []
-bdiff old@(x:xs) new | null pr = Del x : bdiff xs new
-                     | otherwise = Copy pr : bdiff (drop (length pr) old) new
+bdiff _ []           = []
+bdiff old new@(x:xs) | null pr = Ins x : bdiff old xs
+                     | otherwise = Copy pr : bdiff old (drop (length pr) new)
   where
-    pr = maxPrefix old new
+    pr = maxPrefix new old
     maxPrefix [] _                      = []
     maxPrefix pr str | isInfixOf pr str = pr
                      | otherwise        = maxPrefix (init pr) str
