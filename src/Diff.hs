@@ -7,6 +7,8 @@ import           Control.Arrow
 import           Data.Algorithm.Diff
 import           Data.Function
 
+import           Data.List
+
 diff :: ([a] -> Int) -> (a -> a -> Bool) -> [[a]] -> [[a]] -> [Diff a]
 diff hash cmp old new = go hashdiff
   where
@@ -35,3 +37,16 @@ diff hash cmp old new = go hashdiff
           [ diff hash cmp (words lnOld) (words lnNew)
           | [lnNew, lnOld] <- sequence [map fst ls', map fst ls]
           ]
+
+data BDiff a = Del a | Copy [a] deriving Show
+
+bdiff :: Eq a => [a] -> [a] -> [BDiff a]
+bdiff [] _           = []
+bdiff old@(x:xs) new | null pr = Del x : bdiff xs new
+                     | otherwise = Copy pr : bdiff (drop (length pr) old) new
+  where
+    pr = maxPrefix old new
+    maxPrefix [] _                      = []
+    maxPrefix pr str | isInfixOf pr str = pr
+                     | otherwise        = maxPrefix (init pr) str
+
