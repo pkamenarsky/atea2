@@ -20,6 +20,7 @@ executable atea
   -- exposed-modules:     Woot
   other-modules:       Woot,
                        DVCS,
+                       Git,
                        Test
   -- other-extensions:    
   build-depends:       base >=4.7 && <4.8,
@@ -34,6 +35,7 @@ executable atea
                        mtl,
                        -- orgmode-parse,
                        parsec,
+                       process,
                        QuickCheck,
                        servant,
                        servant-client,

@@ -2,16 +2,17 @@
 
 module Ticket where
 
-import Control.Arrow
-import Control.Applicative ((*>))
+import           Control.Arrow
+import           Control.Applicative ((*>))
 
-import Data.List
-import Data.Maybe
+import           Data.List
+import           Data.Maybe
+import qualified Data.Text           as T
 
-import GHC.Generics
+import           GHC.Generics
 
-import Text.Parsec
-import Text.Parsec.Char
+import           Text.Parsec
+import           Text.Parsec.Char
 
 data TicketState = TSActive | TSInactive | TSDone | TSArchived deriving (Eq, Show, Generic)
 
@@ -19,6 +20,13 @@ type Label = Int
 
 data Parsed
 data Org
+
+data Diff a = Insert a | Delete a | Change a a
+
+data Commit = Commit
+  { cmtTime :: Int
+  , cmtText :: T.Text
+  }
 
 data Ticket ty = Ticket
   { tckName     :: String
@@ -98,3 +106,6 @@ orgTickets lbl ots pts = second (flat . org) $ lblTickets lbl ots pts
       | otherwise      = second (t { tckLabel = lbl + 1 }:) $ lblTickets (lbl + 1) lts ts
       where
         lt = find ((== tckName t) . tckName) lts
+
+diffTickets :: [OrgTicket] -> [Commit] -> [Diff OrgTicket]
+diffTickets = undefined
