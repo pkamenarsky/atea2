@@ -4,6 +4,8 @@ module Git where
 
 import           Control.Applicative ((*>))
 
+import qualified Data.Text           as T
+
 import           Text.Parsec
 import           Text.Parsec.Char
 
@@ -45,3 +47,6 @@ parseCommit = do
 
 parseCommits :: String -> [Commit]
 parseCommits = either (const []) id . runParser (many parseCommit) () ""
+
+parseContents :: String -> [Commit] -> IO [String]
+parseContents file = mapM (\Commit {..} -> readProcess "git" ["show", cmtHash ++ ":" ++ file] [])
