@@ -13,8 +13,7 @@ import           System.Process
 
 data Commit = Commit
   { cmtHash   :: String
-  , cmtAuthor :: String
-  , cmtDate   :: String
+  , cmtDate   :: Int
   } deriving Show
 
 crlf :: (Stream s m Char) => ParsecT s u m Char
@@ -25,28 +24,22 @@ endOfLine           = newline <|> crlf       <?> "new-line"
 
 getCommits :: IO String
 getCommits = do
-  commits <- readProcess "git" ["log"] []
+  commits <- readProcess "git" ["log", "--date=raw", "--pretty=format:%h %ad"] []
   return commits
 
 parseCommit :: Stream s m Char => ParsecT s u m Commit
 parseCommit = do
-  let wsLine = space >> many (noneOf "\r\n") >> endOfLine
+  cmtHash <- many1 $ noneOf " "
+  char ' '
+  cmtDate <- read `fmap` (many1 $ noneOf " ")
 
-  string "commit "
-  cmtHash <- many1 $ noneOf "\r\n"
-  endOfLine
-  string "Author: "
-  cmtAuthor <- many1 $ noneOf "\r\n"
-  endOfLine
-  string "Date:   "
-  cmtDate <- many1 $ noneOf "\r\n"
-  endOfLine
-  many (endOfLine <|> wsLine)
+  many1 $ noneOf "\r\n"
+  (endOfLine >> return ()) <|> eof
 
   return $ Commit {..}
 
 parseCommits :: String -> [Commit]
-parseCommits = either (const []) id . runParser (many parseCommit) () ""
+parseCommits = either (error . show) id . runParser (many parseCommit) () ""
 
 parseContents :: String -> [Commit] -> IO [String]
 parseContents file = mapM (\Commit {..} -> readProcess "git" ["show", cmtHash ++ ":" ++ file] [])
