@@ -16,6 +16,11 @@ data Commit = Commit
   , cmtDate   :: Int
   } deriving Show
 
+data Content = Content
+  { cntContent  :: String
+  , cntCommit   :: Commit
+  } deriving Show
+
 crlf :: (Stream s m Char) => ParsecT s u m Char
 crlf                = char '\r' *> char '\n' <?> "crlf new-line"
 
@@ -41,5 +46,7 @@ parseCommit = do
 parseCommits :: String -> [Commit]
 parseCommits = either (error . show) id . runParser (many parseCommit) () ""
 
-parseContents :: String -> [Commit] -> IO [String]
-parseContents file = mapM (\Commit {..} -> readProcess "git" ["show", cmtHash ++ ":" ++ file] [])
+parseContents :: String -> [Commit] -> IO [Content]
+parseContents file = mapM $ \cntCommit@(Commit {..}) -> do
+  cntContent <- readProcess "git" ["show", cmtHash ++ ":" ++ file] []
+  return $ Content { .. }

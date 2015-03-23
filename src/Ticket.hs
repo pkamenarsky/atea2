@@ -3,16 +3,21 @@
 module Ticket where
 
 import           Control.Arrow
-import           Control.Applicative ((*>))
+import           Control.Applicative ((*>), (<$>))
 
+import           Data.Hashable
 import           Data.List
 import           Data.Maybe
+import qualified Data.Map            as M
+import qualified Data.Set            as S
 import qualified Data.Text           as T
 
 import           GHC.Generics
 
 import           Text.Parsec
 import           Text.Parsec.Char
+
+import           Git
 
 data TicketState = TSActive | TSInactive | TSDone | TSArchived deriving (Eq, Show, Generic)
 
@@ -21,12 +26,7 @@ type Label = Int
 data Parsed
 data Org
 
-data Diff a = Insert a | Delete a | Change a a
-
-data Commit = Commit
-  { cmtTime :: Int
-  , cmtText :: T.Text
-  }
+data Diff a = Insert a | Delete a | Change a a | Move a a a deriving (Eq, Show)
 
 data Ticket ty = Ticket
   { tckName     :: String
@@ -43,12 +43,6 @@ type OrgTicket     = Ticket Org
 
 prsLevel :: Stream s m Char => ParsecT s u m Int
 prsLevel = length `fmap` (many1 $ char '*')
-
-crlf :: (Stream s m Char) => ParsecT s u m Char
-crlf                = char '\r' *> char '\n' <?> "crlf new-line"
-
-endOfLine :: (Stream s m Char) => ParsecT s u m Char
-endOfLine           = newline <|> crlf       <?> "new-line"
 
 prsTicket :: Stream s m Char => ParsecT s u m ParsedTicket
 prsTicket = do
@@ -99,6 +93,7 @@ orgTickets lbl ots pts = second (flat . org) $ lblTickets lbl ots pts
     flat [] = []
     flat ((T t ch):ts) = t { tckChildren = map (\(T t' _) -> tckLabel t') ch } : flat ch ++ flat ts
 
+    -- TODO: do the diffing here
     lblTickets :: Label -> [OrgTicket] -> [ParsedTicket] -> (Label, [OrgTicket])
     lblTickets lbl _ [] = (lbl, [])
     lblTickets lbl lts (t:ts)
@@ -107,5 +102,14 @@ orgTickets lbl ots pts = second (flat . org) $ lblTickets lbl ots pts
       where
         lt = find ((== tckName t) . tckName) lts
 
-diffTickets :: [OrgTicket] -> [Commit] -> [Diff OrgTicket]
-diffTickets = undefined
+diffTickets :: Label -> [OrgTicket] -> [Content] -> (Label, [Diff OrgTicket])
+diffTickets lbl ots = undefined
+  where
+    step :: Label -> [OrgTicket] -> Content -> Either ParseError (Label, [Diff OrgTicket])
+    step lbl oldOts (Content {..}) = diff <$> newOts'
+      where
+        ohs     = M.fromList $ map (hash . tckName &&& id) oldOts
+        pts     = runParser prsTickets () "" cntContent
+        newOts' = orgTickets lbl oldOts <$> pts
+
+        diff newOts = undefined
