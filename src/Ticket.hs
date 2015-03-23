@@ -102,6 +102,28 @@ orgTickets lbl ots pts = second (flat . org) $ lblTickets lbl ots pts
       where
         lt = find ((== tckName t) . tckName) lts
 
+diffTickets :: Label -> [OrgTicket] -> [ParsedTicket] -> (Label, [Diff OrgTicket])
+diffTickets lbl ots pts = undefined -- second (flat . org) $ lblTickets lbl ots pts
+  where
+    org []     = []
+    org (t:ts) = T t (org children) : org rs
+      where
+        (children, rs) = span ((> tckLevel t) . tckLevel) ts
+
+    flat [] = []
+    flat ((T t ch):ts) = t { tckChildren = map (\(T t' _) -> tckLabel t') ch } : flat ch ++ flat ts
+
+    -- FIXME: use parent or children? parent is easier to detect movement
+    -- FIXME: deleted tickets
+    lblTickets :: Label -> [OrgTicket] -> [ParsedTicket] -> (Label, [Diff OrgTicket])
+    lblTickets lbl _ [] = (lbl, [])
+    lblTickets lbl lts (t:ts)
+      | Just lt' <- lt = second ((Change lt' $ t { tckLabel = tckLabel lt' }):) $ lblTickets lbl lts ts
+      | otherwise      = second ((Insert $ t { tckLabel = lbl + 1 }):) $ lblTickets (lbl + 1) lts ts
+      where
+        lt = find ((== tckName t) . tckName) lts
+
+{-
 diffTickets :: Label -> [OrgTicket] -> [Content] -> (Label, [Diff OrgTicket])
 diffTickets lbl ots = undefined
   where
@@ -113,3 +135,4 @@ diffTickets lbl ots = undefined
         newOts' = orgTickets lbl oldOts <$> pts
 
         diff newOts = undefined
+-}
