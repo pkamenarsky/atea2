@@ -37,7 +37,7 @@ data Ticket ty = Ticket
   , tckEstimate :: Maybe Int
   , tckChildren :: [Label]
   , tckParent   :: Maybe Label
-  } deriving (Show, Generic)
+  } deriving (Eq, Show, Generic)
 
 type ParsedTicket  = Ticket Parsed
 type OrgTicket     = Ticket Org
@@ -106,39 +106,16 @@ orgTickets lbl ots pts = second (flat . org Nothing) $ lblTickets lbl ots pts
       where
         lt = find ((== tckName t) . tckName) lts
 
-diffTickets :: Label -> [OrgTicket] -> [ParsedTicket] -> (Label, [Diff OrgTicket])
-diffTickets lbl ots pts = undefined -- second (flat . org) $ lblTickets lbl ots pts
+diffTickets :: [OrgTicket] -> [OrgTicket] -> [Diff OrgTicket]
+diffTickets old new = go om' nhs'
   where
-    org _ []       = []
-    org prn (t:ts) = T t prn (org (Just t) children) : org prn rs
-      where
-        (children, rs) = span ((> tckLevel t) . tckLevel) ts
+    om'  = M.fromList $ map (hash . tckName &&& id) old
+    nhs' = map (hash . tckName &&& id) new
+    nm'  = M.fromList nhs'
 
-    flat [] = []
-    flat ((T t prn ch):ts) = t { tckParent = tckLabel <$> prn
-                               , tckChildren = map (\(T t' _ _) -> tckLabel t') ch
-                               } : flat ch ++ flat ts
-
-    -- FIXME: use parent or children? parent is easier to detect movement
-    -- FIXME: deleted tickets
-    lblTickets :: Label -> [OrgTicket] -> [ParsedTicket] -> (Label, [Diff OrgTicket])
-    lblTickets lbl _ [] = (lbl, [])
-    lblTickets lbl lts (t:ts)
-      | Just lt' <- lt = second ((Change lt' $ t { tckLabel = tckLabel lt' }):) $ lblTickets lbl lts ts
-      | otherwise      = second ((Insert $ t { tckLabel = lbl + 1 }):) $ lblTickets (lbl + 1) lts ts
-      where
-        lt = find ((== tckName t) . tckName) lts
-
-{-
-diffTickets :: Label -> [OrgTicket] -> [Content] -> (Label, [Diff OrgTicket])
-diffTickets lbl ots = undefined
-  where
-    step :: Label -> [OrgTicket] -> Content -> Either ParseError (Label, [Diff OrgTicket])
-    step lbl oldOts (Content {..}) = diff <$> newOts'
-      where
-        ohs     = M.fromList $ map (hash . tckName &&& id) oldOts
-        pts     = runParser prsTickets () "" cntContent
-        newOts' = orgTickets lbl oldOts <$> pts
-
-        diff newOts = undefined
--}
+    go om [] = map Delete $ M.elems om
+    go om ((thash, ticket):nhs)
+      | Just o <- M.lookup thash om = if ticket == o
+        then go om nhs
+        else Change o ticket:go (M.delete thash om) nhs
+      | otherwise = Insert ticket:go om nhs
