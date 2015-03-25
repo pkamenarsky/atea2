@@ -107,11 +107,10 @@ orgTickets lbl ots pts = second (flat . org Nothing) $ lblTickets lbl ots pts
       where
         lt = find ((== tckName t) . tckName) lts
 
-diffTickets :: Label -> [OrgTicket] -> [ParsedTicket] -> (Label, [Diff OrgTicket])
-diffTickets lbl old new = (lbl', go oldTckMap newHashes)
+diffTickets :: Label -> [OrgTicket] -> [ParsedTicket] -> (Label, [OrgTicket], [Diff OrgTicket])
+diffTickets lbl old new = (lbl', newTckOrg, go oldTckMap newHashes)
   where
-    oldHashes          = map (hash . tckName &&& id) old
-    oldTckMap          = M.fromList oldHashes
+    oldTckMap          = M.fromList $ map (hash . tckName &&& id) old
 
     (lbl', newTckLbld) = label lbl oldTckMap $ map (hash . tckName &&& id) new
     newTckOrg          = flat $ org Nothing newTckLbld
@@ -128,11 +127,12 @@ diffTickets lbl old new = (lbl', go oldTckMap newHashes)
                                } : flat ch ++ flat ts
 
     label :: Label -> M.Map Int OrgTicket -> [(Int, ParsedTicket)] -> (Label, [OrgTicket])
+    label lbl _ [] = (lbl, [])
     label lbl om ((thash, tck):ths)
       | Just otck <- M.lookup thash om
-        = second (tck { tckLevel = tckLevel otck } :) $ label lbl om ths
+        = second (tck { tckLabel = tckLabel otck } :) $ label lbl om ths
       | otherwise
-        = second (tck { tckLevel = lbl + 1 } :) $ label (lbl + 1) om ths
+        = second (tck { tckLabel = lbl + 1 } :) $ label (lbl + 1) om ths
 
     go om [] = map Delete $ M.elems om
     go om ((thash, tck):ths)
@@ -140,3 +140,16 @@ diffTickets lbl old new = (lbl', go oldTckMap newHashes)
         then go (M.delete thash om) ths
         else Change otck tck:go (M.delete thash om) ths
       | otherwise = Insert tck:go om ths
+
+diffTest :: IO ()
+diffTest = do
+  f1 <- readFile "data/test.org"
+  f2 <- readFile "data/test2.org"
+
+  let t1 = either (const []) id $ runParser prsTickets () "" f1
+      t2 = either (const []) id $ runParser prsTickets () "" f2
+
+      (lbl, ots, diff) = diffTickets 0 [] t1
+      (lbl2, ots2, diff2) = diffTickets lbl ots t2
+
+  print diff2
