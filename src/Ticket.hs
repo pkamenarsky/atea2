@@ -3,14 +3,15 @@
 module Ticket where
 
 import           Control.Arrow
-import           Control.Applicative ((*>), (<$>))
+import           Control.Applicative              ((*>), (<$>))
+import qualified Control.Monad.State              as ST
 
 import           Data.Hashable
 import           Data.List
 import           Data.Maybe
-import qualified Data.Map            as M
-import qualified Data.Set            as S
-import qualified Data.Text           as T
+import qualified Data.Map                         as M
+import qualified Data.Set                         as S
+import qualified Data.Text                        as T
 
 import           GHC.Generics
 
@@ -107,15 +108,22 @@ orgTickets lbl ots pts = second (flat . org Nothing) $ lblTickets lbl ots pts
         lt = find ((== tckName t) . tckName) lts
 
 diffTickets :: [OrgTicket] -> [OrgTicket] -> [Diff OrgTicket]
-diffTickets old new = go om' nhs'
+diffTickets old new = undefined
   where
-    om'  = M.fromList $ map (hash . tckName &&& id) old
-    nhs' = map (hash . tckName &&& id) new
-    nm'  = M.fromList nhs'
+    oldTckMap = M.fromList $ map (hash . tckName &&& id) old
+    newHashes = map (hash . tckName &&& id) new
+    newTckMap = M.fromList newHashes
+
+    label :: Label -> M.Map Int OrgTicket -> [(Int, ParsedTicket)] -> (Label, [OrgTicket])
+    label lbl om ((thash, tck):ths)
+      | Just otck <- M.lookup thash om
+        = second (tck { tckLevel = tckLevel otck } :) $ label lbl om ths
+      | otherwise
+        = second (tck { tckLevel = lbl + 1 } :) $ label (lbl + 1) om ths
 
     go om [] = map Delete $ M.elems om
-    go om ((thash, ticket):nhs)
-      | Just o <- M.lookup thash om = if ticket == o
-        then go om nhs
-        else Change o ticket:go (M.delete thash om) nhs
-      | otherwise = Insert ticket:go om nhs
+    go om ((thash, tck):ths)
+      | Just otck <- M.lookup thash om = if otck == tck
+        then go (M.delete thash om) ths
+        else Change otck tck:go (M.delete thash om) ths
+      | otherwise = Insert tck:go om ths
