@@ -36,6 +36,7 @@ data Ticket ty = Ticket
   , tckAssignee :: Maybe String
   , tckEstimate :: Maybe Int
   , tckChildren :: [Label]
+  , tckParent   :: Maybe Label
   } deriving (Show, Generic)
 
 type ParsedTicket  = Ticket Parsed
@@ -74,24 +75,27 @@ prsTicket = do
   let tckEstimate = Nothing
   let tckLabel    = -1
   let tckChildren = []
+  let tckParent   = Nothing
 
   return $ Ticket {..}
 
 prsTickets :: Stream s m Char => ParsecT s u m [ParsedTicket]
 prsTickets = many prsTicket
 
-data T a = T (Ticket a) [T a]
+data T a = T (Ticket a) (Maybe (Ticket a)) [T a]
 
 orgTickets :: Label -> [OrgTicket] -> [ParsedTicket] -> (Label, [OrgTicket])
-orgTickets lbl ots pts = second (flat . org) $ lblTickets lbl ots pts
+orgTickets lbl ots pts = second (flat . org Nothing) $ lblTickets lbl ots pts
   where
-    org []     = []
-    org (t:ts) = T t (org children) : org rs
+    org _ []       = []
+    org prn (t:ts) = T t prn (org (Just t) children) : org prn rs
       where
         (children, rs) = span ((> tckLevel t) . tckLevel) ts
 
     flat [] = []
-    flat ((T t ch):ts) = t { tckChildren = map (\(T t' _) -> tckLabel t') ch } : flat ch ++ flat ts
+    flat ((T t prn ch):ts) = t { tckParent = tckLabel <$> prn
+                               , tckChildren = map (\(T t' _ _) -> tckLabel t') ch
+                               } : flat ch ++ flat ts
 
     -- TODO: do the diffing here
     lblTickets :: Label -> [OrgTicket] -> [ParsedTicket] -> (Label, [OrgTicket])
@@ -105,13 +109,15 @@ orgTickets lbl ots pts = second (flat . org) $ lblTickets lbl ots pts
 diffTickets :: Label -> [OrgTicket] -> [ParsedTicket] -> (Label, [Diff OrgTicket])
 diffTickets lbl ots pts = undefined -- second (flat . org) $ lblTickets lbl ots pts
   where
-    org []     = []
-    org (t:ts) = T t (org children) : org rs
+    org _ []       = []
+    org prn (t:ts) = T t prn (org (Just t) children) : org prn rs
       where
         (children, rs) = span ((> tckLevel t) . tckLevel) ts
 
     flat [] = []
-    flat ((T t ch):ts) = t { tckChildren = map (\(T t' _) -> tckLabel t') ch } : flat ch ++ flat ts
+    flat ((T t prn ch):ts) = t { tckParent = tckLabel <$> prn
+                               , tckChildren = map (\(T t' _ _) -> tckLabel t') ch
+                               } : flat ch ++ flat ts
 
     -- FIXME: use parent or children? parent is easier to detect movement
     -- FIXME: deleted tickets
