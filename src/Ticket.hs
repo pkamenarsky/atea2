@@ -107,12 +107,25 @@ orgTickets lbl ots pts = second (flat . org Nothing) $ lblTickets lbl ots pts
       where
         lt = find ((== tckName t) . tckName) lts
 
-diffTickets :: [OrgTicket] -> [OrgTicket] -> [Diff OrgTicket]
-diffTickets old new = undefined
+diffTickets :: Label -> [OrgTicket] -> [ParsedTicket] -> (Label, [Diff OrgTicket])
+diffTickets lbl old new = (lbl', go oldTckMap newHashes)
   where
-    oldTckMap = M.fromList $ map (hash . tckName &&& id) old
-    newHashes = map (hash . tckName &&& id) new
-    newTckMap = M.fromList newHashes
+    oldHashes          = map (hash . tckName &&& id) old
+    oldTckMap          = M.fromList oldHashes
+
+    (lbl', newTckLbld) = label lbl oldTckMap $ map (hash . tckName &&& id) new
+    newTckOrg          = flat $ org Nothing newTckLbld
+    newHashes          = map (hash . tckName &&& id) newTckOrg
+
+    org _ []       = []
+    org prn (t:ts) = T t prn (org (Just t) children) : org prn rs
+      where
+        (children, rs) = span ((> tckLevel t) . tckLevel) ts
+
+    flat [] = []
+    flat ((T t prn ch):ts) = t { tckParent = tckLabel <$> prn
+                               , tckChildren = map (\(T t' _ _) -> tckLabel t') ch
+                               } : flat ch ++ flat ts
 
     label :: Label -> M.Map Int OrgTicket -> [(Int, ParsedTicket)] -> (Label, [OrgTicket])
     label lbl om ((thash, tck):ths)
