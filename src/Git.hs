@@ -12,6 +12,8 @@ import           Text.Parsec.Char
 import           System.IO.Error
 import           System.Process
 
+import           GHC.IO.Handle
+
 data Commit = Commit
   { cmtHash   :: String
   , cmtDate   :: Int
@@ -28,12 +30,18 @@ crlf                = char '\r' *> char '\n' <?> "crlf new-line"
 endOfLine :: (Stream s m Char) => ParsecT s u m Char
 endOfLine           = newline <|> crlf       <?> "new-line"
 
+readProcessCwd :: FilePath -> String -> [String] -> IO String
+readProcessCwd path cmd args = do
+  (_, Just hout, _, _) <-
+    createProcess (proc cmd args){ cwd = Just path
+                                 , std_out = CreatePipe }
+  hGetContents hout
+
 getCommits :: FilePath -> Maybe String -> IO String
 getCommits path from = do
   let args = ["log", "--date=raw", "--pretty=format:%h %ad"]
           ++ maybe [] (return . (++ "..HEAD")) from
-          ++ ["-- " ++ path]
-  readProcess "git" args  []
+  readProcessCwd path "git" args
 
 parseCommit :: Stream s m Char => ParsecT s u m Commit
 parseCommit = do
@@ -51,5 +59,5 @@ parseCommits = either (error . show) id . runParser (many parseCommit) () ""
 
 parseContents :: FilePath -> String -> [Commit] -> IO [Content]
 parseContents path file = mapM $ \cntCommit@(Commit {..}) -> do
-  cntContent <- readProcess "git" ["show", cmtHash ++ ":" ++ file, "-- " ++ path] []
+  cntContent <- readProcessCwd path "git" ["show", cmtHash ++ ":" ++ file]
   return $ Content { .. }
