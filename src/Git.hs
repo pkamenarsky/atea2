@@ -2,13 +2,14 @@
 
 module Git where
 
-import           Control.Applicative ((*>))
+import           Control.Applicative ((*>), (<$>))
 
 import qualified Data.Text           as T
 
 import           Text.Parsec
 import           Text.Parsec.Char
 
+import           System.IO.Error
 import           System.Process
 
 data Commit = Commit
@@ -27,10 +28,11 @@ crlf                = char '\r' *> char '\n' <?> "crlf new-line"
 endOfLine :: (Stream s m Char) => ParsecT s u m Char
 endOfLine           = newline <|> crlf       <?> "new-line"
 
-getCommits :: IO String
-getCommits = do
-  commits <- readProcess "git" ["log", "--date=raw", "--pretty=format:%h %ad"] []
-  return commits
+getCommits :: Maybe String -> IO String
+getCommits from = do
+  let args = ["log", "--date=raw", "--pretty=format:%h %ad"]
+          ++ maybe [] (return . (++ "..HEAD")) from
+  readProcess "git" args  []
 
 parseCommit :: Stream s m Char => ParsecT s u m Commit
 parseCommit = do
@@ -50,3 +52,11 @@ parseContents :: String -> [Commit] -> IO [Content]
 parseContents file = mapM $ \cntCommit@(Commit {..}) -> do
   cntContent <- readProcess "git" ["show", cmtHash ++ ":" ++ file] []
   return $ Content { .. }
+
+getLastParsedCommit :: IO (Maybe String)
+getLastParsedCommit = catchIOError (Just <$> readFile ".atea")
+                                   (const $ return Nothing)
+
+setLastParsedCommit :: String -> IO ()
+setLastParsedCommit cmt = catchIOError (writeFile ".atea" cmt)
+                                       (const $ return ())
