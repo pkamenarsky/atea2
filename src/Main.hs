@@ -32,6 +32,7 @@ import           Cors
 import           Diff
 import           DVCS
 import           Git
+import           GitTicket
 import           Logoot
 import           Test
 import           Ticket

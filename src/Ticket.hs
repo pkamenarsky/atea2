@@ -1,4 +1,4 @@
-{-# LANGUAGE StandaloneDeriving, DeriveGeneric, FlexibleContexts, RecordWildCards, TypeFamilies, UndecidableInstances #-}
+{-# LANGUAGE StandaloneDeriving, DeriveGeneric, FlexibleContexts, RecordWildCards #-}
 
 module Ticket where
 
