@@ -49,7 +49,7 @@ parseCommit = do
 parseCommits :: String -> [Commit]
 parseCommits = either (error . show) id . runParser (many parseCommit) () ""
 
-parseContents :: String -> [Commit] -> IO [Content]
-parseContents file = mapM $ \cntCommit@(Commit {..}) -> do
-  cntContent <- readProcess "git" ["show", cmtHash ++ ":" ++ file] []
+parseContents :: FilePath -> String -> [Commit] -> IO [Content]
+parseContents path file = mapM $ \cntCommit@(Commit {..}) -> do
+  cntContent <- readProcess "git" ["show", cmtHash ++ ":" ++ file, "-- " ++ path] []
   return $ Content { .. }

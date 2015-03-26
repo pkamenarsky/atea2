@@ -18,13 +18,10 @@ data GTState = GTState
 
 updateTickets :: FilePath -> GTState -> IO GTState
 updateTickets path st@(GTState {..}) = do
-  cmts <- getCommits path (cmtHash <$> stLastCommit)
+  cmts <- parseCommits <$> getCommits path (cmtHash <$> stLastCommit)
+  cnts <- parseContents path "tasks.org" cmts
 
-  let parsed = parseCommits cmts
-
-  cnts <- parseContents "tasks.org" parsed
-
-  return $ foldl updateState st (zip parsed cnts)
+  return $ foldl updateState st (zip cmts cnts)
 
 updateState :: GTState -> (Commit, Content) -> GTState
 updateState (GTState {..}) (cmt, cnt)
