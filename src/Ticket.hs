@@ -11,6 +11,7 @@ import           Data.List
 import           Data.Maybe
 import qualified Data.Map                         as M
 import qualified Data.Set                         as S
+import           Data.Serialize
 import qualified Data.Text                        as T
 
 import           GHC.Generics

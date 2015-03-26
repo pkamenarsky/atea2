@@ -28,10 +28,11 @@ crlf                = char '\r' *> char '\n' <?> "crlf new-line"
 endOfLine :: (Stream s m Char) => ParsecT s u m Char
 endOfLine           = newline <|> crlf       <?> "new-line"
 
-getCommits :: Maybe String -> IO String
-getCommits from = do
+getCommits :: FilePath -> Maybe String -> IO String
+getCommits path from = do
   let args = ["log", "--date=raw", "--pretty=format:%h %ad"]
           ++ maybe [] (return . (++ "..HEAD")) from
+          ++ ["-- " ++ path]
   readProcess "git" args  []
 
 parseCommit :: Stream s m Char => ParsecT s u m Commit
@@ -52,11 +53,3 @@ parseContents :: String -> [Commit] -> IO [Content]
 parseContents file = mapM $ \cntCommit@(Commit {..}) -> do
   cntContent <- readProcess "git" ["show", cmtHash ++ ":" ++ file] []
   return $ Content { .. }
-
-getLastParsedCommit :: IO (Maybe String)
-getLastParsedCommit = catchIOError (Just <$> readFile ".atea")
-                                   (const $ return Nothing)
-
-setLastParsedCommit :: String -> IO ()
-setLastParsedCommit cmt = catchIOError (writeFile ".atea" cmt)
-                                       (const $ return ())
