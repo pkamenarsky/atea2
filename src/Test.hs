@@ -55,25 +55,25 @@ unfoldrM' f z = do
                         xs <- unfoldrM' f z
                         return (return x `mplus` xs)
 
-instance Arbitrary [[ParsedTicket]] where
-  arbitrary = do
-    old' <- arbitrary :: Gen [ParsedTicket]
+genTickets :: Gen [[ParsedTicket]]
+genTickets = do
+  old' <- arbitrary :: Gen [ParsedTicket]
 
-    let insertRnd :: [a] -> [a] -> Gen [a]
-        insertRnd [] xs     = return xs
-        insertRnd (e:es) xs = do
-          pos <- choose (0, length xs - 1)
-          insertRnd es ((take pos xs) ++ [e] ++ (drop pos xs))
+  let insertRnd :: [a] -> [a] -> Gen [a]
+      insertRnd [] xs     = return xs
+      insertRnd (e:es) xs = do
+        pos <- choose (0, length xs)
+        insertRnd es ((take pos xs) ++ [e] ++ (drop pos xs))
 
-    flip unfoldrM' (0, old') $ \(i, old) -> if i >= 100
-      then return Nothing
-      else do
-        oldElemsCnt <- choose (0, length old)
-        oldElems    <- replicateM oldElemsCnt (choose (0, length old))
-        new'        <- arbitrary
-        new         <- insertRnd (map (old !!) oldElems) new'
+  flip unfoldrM' (0, old') $ \(i, old) -> if i >= 3
+    then return Nothing
+    else do
+      oldElemsCnt <- choose (0, length old)
+      oldElems    <- replicateM oldElemsCnt (choose (0, length old - 1))
+      new'        <- arbitrary
+      new         <- insertRnd (map (old !!) oldElems) new'
 
-        return $ Just (new, (i + 1, new))
+      return $ Just (new, (i + 1, new))
 
 testDiffTicket :: [OrgTicket] -> [ParsedTicket] -> Bool
 testDiffTicket = undefined
