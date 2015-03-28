@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds, DeriveGeneric, FlexibleInstances, RecordWildCards, StandaloneDeriving, TypeOperators, TypeSynonymInstances #-}
+{-# LANGUAGE DataKinds, DeriveGeneric, FlexibleInstances, OverloadedStrings, RecordWildCards, StandaloneDeriving, TypeOperators, TypeSynonymInstances #-}
 
 module Users where
 
@@ -11,10 +11,10 @@ import           Network.Wai.Handler.Warp
 import           Servant.API
 import           Servant.Server
 
-type UserApi = "register" :> Capture "user" T.Text
-                          :> Capture "pass" T.Text
-                          :> Capture "email" T.Text
-                          :> Capture "key" T.Text
+type UserApi = "register" :> QueryParam "user" T.Text
+                          :> QueryParam "pass" T.Text
+                          :> QueryParam "email" T.Text
+                          :> QueryParam "key" T.Text
                           :> Get T.Text
 
 userApi :: Proxy UserApi
@@ -23,7 +23,13 @@ userApi = Proxy
 userServer :: Server UserApi
 userServer = apiRegister
   where
-    apiRegister user pass email key = return $ user <> pass <> email <> key
+    apiRegister user' pass' email' key'
+      | Just user  <- user'
+      , Just pass  <- pass'
+      , Just email <- email'
+      , Just key   <- key'
+        = return $ user <> pass <> email <> key
+      | otherwise = return "error"
 
 runUserServer :: IO ()
 runUserServer = do
