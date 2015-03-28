@@ -63,10 +63,11 @@ prsTicket = do
                    _ <- skipMany1 space
                    return s
   tckName     <- many1 $ noneOf "\r\n"
-  _           <- endOfLine
+  _           <- try $ endOfLine
 
   let tckState = case state of
         Nothing            -> TSInactive
+        Just "WORKING"     -> TSActive
         Just "WORK"        -> TSActive
         Just "W"           -> TSActive
         Just "IN-PROGRESS" -> TSActive
