@@ -36,6 +36,7 @@ import           GitTicket
 import           Logoot
 import           Test
 import           Ticket
+import           Users
 
 type Ack = Int
 

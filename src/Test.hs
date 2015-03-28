@@ -65,7 +65,7 @@ genTickets = do
         pos <- choose (0, length xs)
         insertRnd es ((take pos xs) ++ [e] ++ (drop pos xs))
 
-  flip unfoldrM' (0, old') $ \(i, old) -> if i >= 3
+  flip unfoldrM' (0, old') $ \(i, old) -> if i >= 10
     then return Nothing
     else do
       oldElemsCnt <- choose (0, length old)
@@ -75,5 +75,5 @@ genTickets = do
 
       return $ Just (new, (i + 1, new))
 
-testDiffTicket :: [OrgTicket] -> [ParsedTicket] -> Bool
+testDiffTicket :: [[ParsedTicket]] -> Bool
 testDiffTicket = undefined
